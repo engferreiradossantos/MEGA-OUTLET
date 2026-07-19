@@ -1,0 +1,12 @@
+# Banco de dados local (dados de produção não vão para o Git)
+data/
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
