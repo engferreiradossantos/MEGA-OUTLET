@@ -1,8 +1,17 @@
 # 🏬 MEGA OUTLET — Sistema de Gestão
 
 Sistema de **estoque, vendas (PDV) e fluxo de caixa** para loja de móveis e
-eletroeletrônicos, construído em **Python + Streamlit + SQLite**, conforme o
-documento de requisitos do projeto.
+eletroeletrônicos, conforme o documento de requisitos do projeto —
+disponível em **duas implementações**:
+
+| Versão | Tecnologia | Onde está | Como usar |
+|---|---|---|---|
+| **Web local** | Python + Streamlit + SQLite | raiz deste repositório | instruções abaixo |
+| **Google Sheets** | Google Apps Script + HTML/CSS | pasta [`google-apps-script/`](google-apps-script/) | [guia de instalação](google-apps-script/README.md) |
+
+As duas versões implementam as mesmas regras de negócio (baixa automática de
+estoque, entrada automática no caixa, venda sob encomenda e aviso legal de
+outlet). O restante deste README descreve a **versão Python/Streamlit**.
 
 ## Como executar
 

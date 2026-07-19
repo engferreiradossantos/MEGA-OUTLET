@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<!--
+  MEGA OUTLET — Lançamento manual no Fluxo de Caixa (regra 3.2, Conciliação).
+  Usado para despesas operacionais (fornecedor, custos fixos, pró-labore)
+  e entradas avulsas. As Entradas de venda são geradas pelo PDV.
+-->
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 14px;
+           margin: 0; padding: 16px; color: #222; }
+    label { display: block; font-size: 12px; color: #555; margin-top: 10px; }
+    input, select, button { width: 100%; padding: 8px; margin-top: 2px;
+      border: 1px solid #bbb; border-radius: 4px; font-size: 14px; }
+    button { background: #188038; color: #fff; font-weight: bold;
+             border: none; cursor: pointer; margin-top: 16px; padding: 10px; }
+    .mensagem { padding: 10px; border-radius: 4px; margin-top: 12px;
+                display: none; white-space: pre-wrap; }
+    .mensagem.sucesso { display: block; background: #e6f4ea; color: #188038; }
+    .mensagem.erro { display: block; background: #fce8e6; color: #c5221f; }
+  </style>
+</head>
+<body>
+  <label>Tipo</label>
+  <select id="tipo"></select>
+
+  <label>Categoria</label>
+  <select id="categoria"></select>
+
+  <label>Valor (R$)</label>
+  <input id="valor" type="number" min="0.01" step="0.01" placeholder="0,00">
+
+  <label>Forma de pagamento</label>
+  <select id="forma-pagamento"></select>
+
+  <button id="botao-lancar" onclick="lancar()">💾 Lançar no caixa</button>
+  <div id="mensagem" class="mensagem"></div>
+
+<script>
+  // Carrega as opções dos selects a partir das constantes do servidor
+  google.script.run.withSuccessHandler(function (opcoes) {
+    preencherSelect('tipo', opcoes.tiposLancamento);
+    preencherSelect('categoria', opcoes.categoriasCaixa);
+    preencherSelect('forma-pagamento', opcoes.formasPagamento);
+    document.getElementById('tipo').value = 'Saída';       // padrão: despesa
+    document.getElementById('categoria').value = 'Custos Fixos';
+  }).obterOpcoesFormularios();
+
+  function preencherSelect(id, valores) {
+    var select = document.getElementById(id);
+    valores.forEach(function (v) {
+      var opcao = document.createElement('option');
+      opcao.value = v; opcao.textContent = v;
+      select.appendChild(opcao);
+    });
+  }
+
+  function lancar() {
+    var botao = document.getElementById('botao-lancar');
+    botao.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function (resultado) {
+        botao.disabled = false;
+        mostrar('sucesso', 'Lançamento Nº ' + resultado.idLancamento +
+                           ' registrado no caixa.');
+        document.getElementById('valor').value = '';
+      })
+      .withFailureHandler(function (erro) {
+        botao.disabled = false;
+        mostrar('erro', '⚠️ ' + (erro.message || erro));
+      })
+      .registrarLancamentoManual({
+        tipo: document.getElementById('tipo').value,
+        categoria: document.getElementById('categoria').value,
+        valor: parseFloat(document.getElementById('valor').value),
+        formaPagamento: document.getElementById('forma-pagamento').value,
+      });
+  }
+
+  function mostrar(classe, texto) {
+    var div = document.getElementById('mensagem');
+    div.className = 'mensagem ' + classe;
+    div.textContent = texto;
+  }
+</script>
+</body>
+</html>
