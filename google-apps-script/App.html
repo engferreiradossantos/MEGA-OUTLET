@@ -509,14 +509,31 @@ var carrinhoPdv = [], buscaPdv = [];
 var carrinhoOrc = [], buscaOrc = [];
 var listaClientes = [], listaUsuarios = [], listaProdutosCache = [];
 
-// Chamada ao servidor com Promise (google.script.run)
+// Chamada ao servidor com Promise (google.script.run).
+// Importante: o google.script.run NÃO aceita .apply()/.call() nos seus
+// métodos — é preciso invocar diretamente runner[funcao](arg1, arg2, ...).
 function rpc(funcao) {
   var args = Array.prototype.slice.call(arguments, 1);
   return new Promise(function (resolve, reject) {
     var runner = google.script.run
       .withSuccessHandler(resolve)
       .withFailureHandler(reject);
-    runner[funcao].apply(runner, args);
+    if (typeof runner[funcao] !== 'function') {
+      reject(new Error('Função de servidor "' + funcao + '" indisponível. ' +
+        'Confirme que TODOS os arquivos .gs foram colados no projeto do ' +
+        'Apps Script (Codigo, Produtos, Vendas, Caixa, Usuarios, Clientes, ' +
+        'Orcamentos, Relatorios).'));
+      return;
+    }
+    // Chamada direta (método do runner) — jamais via apply/call
+    switch (args.length) {
+      case 0: runner[funcao](); break;
+      case 1: runner[funcao](args[0]); break;
+      case 2: runner[funcao](args[0], args[1]); break;
+      case 3: runner[funcao](args[0], args[1], args[2]); break;
+      case 4: runner[funcao](args[0], args[1], args[2], args[3]); break;
+      default: runner[funcao](args[0], args[1], args[2], args[3], args[4]);
+    }
   });
 }
 

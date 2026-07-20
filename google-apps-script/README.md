@@ -64,7 +64,9 @@ relatório gerencial.
 | `Clientes` | Cadastro de clientes |
 | `Fluxo_Caixa` | Entradas/Saídas com forma de pagamento, venda vinculada e usuário |
 | `Usuarios` | Login, perfil e hash de senha (aba oculta; gestão pela tela 👤) |
-| `Dashboard` | Indicadores por fórmulas, para consulta rápida dentro da própria planilha |
+
+> O **Dashboard e os relatórios não são abas** da planilha — ficam apenas
+> dentro do sistema (telas 📊 e 📈 do App), calculados ao vivo a cada acesso.
 
 ## ⚙️ Regras de negócio
 

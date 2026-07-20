@@ -24,8 +24,9 @@ const ABAS = {
   ORCAMENTOS: 'Orcamentos',   // orçamentos/pedidos (não baixam estoque)
   ITENS_ORC: 'Itens_Orcamento',
   USUARIOS: 'Usuarios',       // usuários do sistema (login, senha, perfil)
-  DASHBOARD: 'Dashboard',     // requisito 4 — indicadores
 };
+// Observação: o Dashboard NÃO é uma aba da planilha — ele existe apenas
+// dentro do sistema (tela 📊 Dashboard do App.html), calculado ao vivo.
 
 // Cabeçalhos de cada aba — a ORDEM define as colunas usadas pelo código
 const CABECALHOS = {
@@ -166,8 +167,11 @@ function abrirSistema() {
 // ---------------------------------------------------------------------------
 
 /**
- * Cria as abas de dados + Dashboard, com cabeçalhos, validações de dados
- * (listas suspensas), formatos de número e fórmulas dos indicadores.
+ * Cria as abas de dados (Produtos, Vendas, Itens_Venda, Fluxo_Caixa,
+ * Clientes, Orcamentos, Itens_Orcamento, Usuarios), com cabeçalhos,
+ * validações de dados (listas suspensas) e formatos de número.
+ * O Dashboard e os relatórios ficam SÓ no sistema (App.html), calculados
+ * ao vivo — não há aba Dashboard na planilha.
  * Função de MENU: o getUi() na primeira linha garante que ela só roda de
  * dentro da planilha (em uma implantação como App da Web, falha de imediato).
  */
@@ -217,35 +221,12 @@ function configurarPlanilha() {
   abaOrcamentos.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
   abaOrcamentos.getRange('I2:I').setNumberFormat('"R$" #,##0.00');
 
-  // ----- Dashboard (requisito 4) ------------------------------------------
-  const dash = obterOuCriarAba_(planilha, ABAS.DASHBOARD);
-  dash.getRange('A1').setValue('📊 DASHBOARD — MEGA OUTLET')
-    .setFontWeight('bold').setFontSize(14);
-
-  dash.getRange('A3').setValue('Faturamento de hoje');
-  dash.getRange('B3').setFormula('=SUMIFS(Vendas!H2:H, Vendas!B2:B, TODAY())');
-
-  dash.getRange('A4').setValue('Faturamento do mês');
-  dash.getRange('B4').setFormula(
-    '=SUMPRODUCT((TEXT(Vendas!B2:B,"yyyy-mm")=TEXT(TODAY(),"yyyy-mm"))*Vendas!H2:H)');
-
-  dash.getRange('A5').setValue('Saldo atual do caixa');
-  dash.getRange('B5').setFormula(
-    '=SUMIF(Fluxo_Caixa!C2:C,"Entrada",Fluxo_Caixa!E2:E)' +
-    '-SUMIF(Fluxo_Caixa!C2:C,"Saída",Fluxo_Caixa!E2:E)');
-
-  dash.getRange('A3:A5').setFontWeight('bold');
-  dash.getRange('B3:B5').setNumberFormat('"R$" #,##0.00');
-
-  dash.getRange('A7').setValue('⚠️ Produtos com estoque igual ou abaixo do mínimo')
-    .setFontWeight('bold');
-  dash.getRange('A8:D8')
-    .setValues([['SKU', 'Descrição', 'Estoque atual', 'Mínimo']])
-    .setFontWeight('bold').setBackground('#fce8e6');
-  dash.getRange('A9').setFormula(
-    '=IFERROR(FILTER({Produtos!B2:C, Produtos!E2:F},' +
-    ' Produtos!E2:E<=Produtos!F2:F, Produtos!B2:B<>""),' +
-    ' "✅ Nenhum produto abaixo do mínimo")');
+  // Remove uma eventual aba "Dashboard" de versões anteriores — o Dashboard
+  // agora vive apenas no sistema (tela 📊 do App.html), não na planilha.
+  const dashAntigo = planilha.getSheetByName('Dashboard');
+  if (dashAntigo && planilha.getSheets().length > 1) {
+    planilha.deleteSheet(dashAntigo);
+  }
 
   ui.alert(
     'Planilha configurada! Abas criadas: ' +
