@@ -172,16 +172,26 @@
 
     <!-- ============ DASHBOARD ============ -->
     <section id="tela-dashboard" class="tela">
+      <div class="painel" style="display:flex;align-items:center;gap:12px">
+        <strong>Ano:</strong>
+        <select id="dash-ano" style="width:auto" onchange="carregarDashboard()"></select>
+        <span class="discreto">Métricas financeiras e gráficos consideram o ano
+          selecionado; custo do estoque e "a receber" são a posição atual.</span>
+      </div>
       <div class="cartoes" id="dash-cartoes"></div>
       <div class="duas-colunas">
         <div class="painel">
-          <h3>🧾 Últimas vendas</h3>
-          <div id="dash-vendas" class="rolagem"></div>
+          <h3>📈 Entradas e saídas por mês</h3>
+          <div id="dash-gastos"></div>
         </div>
         <div class="painel">
-          <h3>⚠️ Estoque abaixo do mínimo</h3>
-          <div id="dash-estoque" class="rolagem"></div>
+          <h3>🏆 Produtos mais vendidos</h3>
+          <div id="dash-produtos"></div>
         </div>
+      </div>
+      <div class="painel">
+        <h3>⚠️ Estoque abaixo do mínimo</h3>
+        <div id="dash-estoque" class="rolagem"></div>
       </div>
     </section>
 
@@ -232,7 +242,14 @@
           <div><label>Forma de entrega</label>
             <select id="pdv-entrega" onchange="pdvAlternarEndereco()"></select></div>
           <div><label>Forma de pagamento</label>
-            <select id="pdv-pagamento"></select></div>
+            <select id="pdv-pagamento" onchange="pdvAlternarParcelas()"></select></div>
+          <div id="pdv-bloco-parcelas" style="display:none">
+            <label>Parcelas (cartão de crédito)</label>
+            <select id="pdv-parcelas" onchange="pdvMostrarValorParcela()"></select>
+            <div class="discreto" id="pdv-valor-parcela"></div>
+          </div>
+        </div>
+        <div class="linha-campos c3">
           <div id="pdv-bloco-endereco" style="display:none">
             <label>Endereço de entrega *</label><input id="pdv-endereco"></div>
         </div>
@@ -256,11 +273,6 @@
           <button class="bt-azul" onclick="imprimirHtml(docAtual)">🖨️ Imprimir</button>
           <button class="bt-cinza" onclick="pdvBaixarPdf()">⬇️ Baixar PDF</button>
         </div>
-      </div>
-
-      <div class="painel">
-        <h3>🧾 Vendas recentes</h3>
-        <div id="pdv-vendas-recentes" class="rolagem"></div>
       </div>
     </section>
 
@@ -371,7 +383,8 @@
       </div>
       <div class="duas-colunas" id="est-admin" style="display:none">
         <div class="painel">
-          <h3>Cadastrar produto</h3>
+          <h3 id="est-form-titulo">Cadastrar produto</h3>
+          <input type="hidden" id="est-id">
           <div class="linha-campos c2">
             <div><label>SKU / Código *</label><input id="est-sku"></div>
             <div><label>Descrição *</label><input id="est-descricao"></div>
@@ -383,15 +396,19 @@
               <input id="est-minimo" type="number" min="0" value="0"></div>
           </div>
           <div class="linha-campos c3">
-            <div><label>Qtd. inicial</label>
+            <div><label id="est-qtd-label">Qtd. inicial</label>
               <input id="est-qtd" type="number" min="0" value="0"></div>
             <div><label>Preço de custo</label>
               <input id="est-custo" type="number" min="0" step="0.01"></div>
             <div><label>Preço de venda</label>
               <input id="est-venda" type="number" min="0" step="0.01"></div>
           </div>
-          <button class="bt-verde largura-total" style="margin-top:10px"
-                  onclick="estCadastrar()">💾 Cadastrar produto</button>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="bt-verde" style="flex:1" id="est-salvar"
+                    onclick="estSalvar()">💾 Cadastrar produto</button>
+            <button class="bt-cinza" onclick="estLimparFormulario()">
+              Novo / Limpar</button>
+          </div>
         </div>
         <div class="painel">
           <h3>Repor estoque (entrada de mercadoria)</h3>
@@ -437,6 +454,25 @@
       <div class="painel">
         <h3>💰 Extrato</h3>
         <div id="cx-extrato" class="rolagem"></div>
+      </div>
+    </section>
+
+    <!-- ============ RECEBÍVEIS (parcelas a receber) ============ -->
+    <section id="tela-recebiveis" class="tela">
+      <div class="cartoes" id="rec-cartoes"></div>
+      <div class="painel" style="display:flex;align-items:center;gap:12px">
+        <strong>Mostrar:</strong>
+        <select id="rec-filtro" style="width:auto" onchange="carregarRecebiveis()">
+          <option value="Pendente">Pendentes (a receber)</option>
+          <option value="Recebida">Recebidas</option>
+          <option value="">Todas</option>
+        </select>
+        <span class="discreto">Parcelas de vendas no cartão de crédito. Ao
+          receber, o valor entra automaticamente no fluxo de caixa.</span>
+      </div>
+      <div class="painel">
+        <h3>📥 Parcelas</h3>
+        <div id="rec-lista" class="rolagem"></div>
       </div>
     </section>
 
@@ -520,8 +556,10 @@ var ARQUIVO_DA_FUNCAO = {
   extratoCaixa: 'Caixa.gs',
   buscarProdutos: 'Produtos.gs', listarProdutos: 'Produtos.gs',
   cadastrarProduto: 'Produtos.gs', reporEstoque: 'Produtos.gs',
+  editarProduto: 'Produtos.gs', excluirProduto: 'Produtos.gs',
   registrarVenda: 'Vendas.gs', listarVendas: 'Vendas.gs',
   obterReciboHtml: 'Vendas.gs', gerarPdfRecibo: 'Vendas.gs',
+  listarParcelas: 'Caixa.gs', receberParcela: 'Caixa.gs',
   listarClientes: 'Clientes.gs', buscarClientes: 'Clientes.gs',
   salvarCliente: 'Clientes.gs',
   criarOrcamento: 'Orcamentos.gs', listarOrcamentos: 'Orcamentos.gs',
@@ -667,7 +705,7 @@ function aoLogar(sessao) {
   rpc('obterOpcoesFormularios').then(function (o) {
     opcoes = o;
     montarMenu();
-    abrirTela('dashboard');
+    abrirTela('vendas'); // após o login, abre direto no PDV
     verificarInstalacao(); // avisa (sem travar) se faltar algum arquivo .gs
   }).catch(falha);
 }
@@ -682,12 +720,13 @@ function sair() {
 
 // ============================ Navegação ============================
 var TELAS = [
-  { id: 'dashboard',  rotulo: 'Dashboard',      icone: '📊', admin: false, carregar: carregarDashboard },
   { id: 'vendas',     rotulo: 'Vendas (PDV)',   icone: '🛒', admin: false, carregar: carregarVendas },
+  { id: 'dashboard',  rotulo: 'Dashboard',      icone: '📊', admin: false, carregar: carregarDashboard },
   { id: 'orcamentos', rotulo: 'Orçamentos',     icone: '📄', admin: false, carregar: carregarOrcamentos },
   { id: 'clientes',   rotulo: 'Clientes',       icone: '🤝', admin: false, carregar: carregarClientes },
   { id: 'estoque',    rotulo: 'Estoque',        icone: '📦', admin: false, carregar: carregarEstoque },
   { id: 'caixa',      rotulo: 'Fluxo de Caixa', icone: '💰', admin: true,  carregar: carregarCaixa },
+  { id: 'recebiveis', rotulo: 'Recebíveis',     icone: '📥', admin: true,  carregar: carregarRecebiveis },
   { id: 'relatorios', rotulo: 'Relatórios',     icone: '📈', admin: true,  carregar: carregarRelatorios },
   { id: 'usuarios',   rotulo: 'Usuários',       icone: '👤', admin: true,  carregar: carregarUsuarios },
 ];
@@ -731,28 +770,113 @@ function tabelaHtml(titulos, linhas, vazio) {
 }
 
 // ============================ Dashboard ============================
+var MESES_CURTOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago',
+                    'Set', 'Out', 'Nov', 'Dez'];
+
+// Um "cartão" de indicador
+function cartao(rotulo, valor, cor) {
+  return '<div class="cartao"><div class="rotulo">' + esc(rotulo) + '</div>' +
+    '<div class="valor"' + (cor ? ' style="color:' + cor + '"' : '') + '>' +
+    valor + '</div></div>';
+}
+
+// Gráfico de barras agrupadas (entradas x saídas) por mês, em SVG puro
+function graficoMensalSvg(serie) {
+  var larguraTotal = 560, altura = 220, margemBaixo = 26, margemTopo = 10;
+  var maximo = 1;
+  serie.forEach(function (m) {
+    maximo = Math.max(maximo, m.entradas, m.saidas);
+  });
+  var largGrupo = larguraTotal / 12;
+  var largBarra = largGrupo / 2 - 3;
+  var alturaUtil = altura - margemBaixo - margemTopo;
+  var barras = '';
+  serie.forEach(function (m, i) {
+    var x = i * largGrupo;
+    var hE = Math.round((m.entradas / maximo) * alturaUtil);
+    var hS = Math.round((m.saidas / maximo) * alturaUtil);
+    barras +=
+      '<rect x="' + (x + 3) + '" y="' + (margemTopo + alturaUtil - hE) +
+      '" width="' + largBarra + '" height="' + hE +
+      '" fill="#16a34a" rx="2"><title>' + MESES_CURTOS[i] + ' — Entradas ' +
+      moeda(m.entradas) + '</title></rect>' +
+      '<rect x="' + (x + 3 + largBarra + 2) + '" y="' +
+      (margemTopo + alturaUtil - hS) + '" width="' + largBarra + '" height="' +
+      hS + '" fill="#dc2626" rx="2"><title>' + MESES_CURTOS[i] + ' — Saídas ' +
+      moeda(m.saidas) + '</title></rect>' +
+      '<text x="' + (x + largGrupo / 2) + '" y="' + (altura - 8) +
+      '" font-size="10" fill="#64748b" text-anchor="middle">' +
+      MESES_CURTOS[i] + '</text>';
+  });
+  return '<div style="overflow-x:auto">' +
+    '<div style="margin-bottom:6px;font-size:12px">' +
+    '<span class="selo selo-verde">■ Entradas</span> ' +
+    '<span class="selo selo-vermelho">■ Saídas</span></div>' +
+    '<svg viewBox="0 0 ' + larguraTotal + ' ' + altura +
+    '" width="100%" style="max-width:640px">' + barras + '</svg></div>';
+}
+
+// Barras horizontais (produtos mais vendidos)
+function barrasHorizontais(itens, rotuloFn, valorFn, textoFn) {
+  if (!itens.length) return '<p class="discreto">Sem dados no período.</p>';
+  var maximo = 1;
+  itens.forEach(function (x) { maximo = Math.max(maximo, valorFn(x)); });
+  return itens.map(function (x) {
+    var pct = Math.round((valorFn(x) / maximo) * 100);
+    return '<div style="margin:6px 0">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
+      '<span>' + esc(rotuloFn(x)) + '</span><span class="discreto">' +
+      textoFn(x) + '</span></div>' +
+      '<div style="background:#e2e8f0;border-radius:6px;height:10px">' +
+      '<div style="width:' + pct + '%;background:#2563eb;height:10px;' +
+      'border-radius:6px"></div></div></div>';
+  }).join('');
+}
+
 function carregarDashboard() {
-  rpc('dadosDashboard', tokenSessao).then(function (d) {
-    var cartoes =
-      '<div class="cartao"><div class="rotulo">Faturamento de hoje</div>' +
-      '<div class="valor">' + moeda(d.faturamentoHoje) + '</div></div>' +
-      '<div class="cartao"><div class="rotulo">Faturamento do mês</div>' +
-      '<div class="valor">' + moeda(d.faturamentoMes) + '</div></div>';
-    if (d.saldoCaixa !== null) {
-      cartoes += '<div class="cartao"><div class="rotulo">Saldo do caixa</div>' +
-        '<div class="valor">' + moeda(d.saldoCaixa) + '</div></div>';
+  var ano = el('dash-ano').value || '';
+  rpc('dadosDashboard', tokenSessao, ano).then(function (d) {
+    // Preenche o seletor de ano na primeira vez (do ano atual até 4 anos atrás)
+    if (!el('dash-ano').options.length) {
+      var sel = el('dash-ano');
+      for (var a = d.anoAtual; a >= d.anoAtual - 4; a--) {
+        var o = document.createElement('option');
+        o.value = a; o.textContent = a;
+        sel.appendChild(o);
+      }
+      sel.value = d.ano;
     }
-    cartoes += '<div class="cartao"><div class="rotulo">Produtos p/ repor</div>' +
-      '<div class="valor">' + d.abaixoMinimo.length + '</div></div>';
+
+    // Cartões: vendedor vê só vendas; admin vê o painel financeiro completo
+    var cartoes =
+      cartao('Total vendido (' + d.ano + ')', moeda(d.totalVendidoAno)) +
+      cartao('Faturamento do mês', moeda(d.faturamentoMes)) +
+      cartao('Faturamento de hoje', moeda(d.faturamentoHoje));
+    if (d.ehAdmin) {
+      cartoes =
+        cartao('Total vendido (' + d.ano + ')', moeda(d.totalVendidoAno)) +
+        cartao('Total recebido (' + d.ano + ')', moeda(d.recebidoAno), '#16a34a') +
+        cartao('Entradas (' + d.ano + ')', moeda(d.entradasAno), '#16a34a') +
+        cartao('Saídas (' + d.ano + ')', moeda(d.saidasAno), '#dc2626') +
+        cartao('Lucro bruto (' + d.ano + ')', moeda(d.lucroAno),
+               d.lucroAno >= 0 ? '#16a34a' : '#dc2626') +
+        cartao('Custo do estoque', moeda(d.custoEstoque)) +
+        cartao('A receber (parcelas)', moeda(d.aReceber), '#d97706') +
+        cartao('Saldo do caixa', moeda(d.saldoCaixa));
+    }
     el('dash-cartoes').innerHTML = cartoes;
 
-    el('dash-vendas').innerHTML = tabelaHtml(
-      ['Nº', 'Data', 'Cliente', 'Vendedor', '<span class="num">Total</span>'],
-      d.ultimasVendas.map(function (v) {
-        return '<tr><td>' + v.idVenda + '</td><td>' + esc(v.data) + '</td>' +
-          '<td>' + esc(v.clienteNome) + '</td><td>' + esc(v.vendedor) +
-          '</td><td class="num">' + moeda(v.valorTotal) + '</td></tr>';
-      }), 'Nenhuma venda registrada ainda.');
+    // Gráfico entradas x saídas (só admin)
+    el('dash-gastos').innerHTML = d.serieMeses
+      ? graficoMensalSvg(d.serieMeses)
+      : '<p class="discreto">Disponível apenas para o Administrador.</p>';
+
+    // Produtos mais vendidos (todos os perfis)
+    el('dash-produtos').innerHTML = barrasHorizontais(
+      d.topProdutos,
+      function (p) { return p.produto; },
+      function (p) { return p.quantidade; },
+      function (p) { return p.quantidade + ' un · ' + moeda(p.valor); });
 
     el('dash-estoque').innerHTML = tabelaHtml(
       ['SKU', 'Produto', 'Estoque', 'Mínimo'],
@@ -788,24 +912,35 @@ function clientePorId(id) {
 function carregarVendas() {
   preencherSelect('pdv-entrega', opcoes.formasEntrega);
   preencherSelect('pdv-pagamento', opcoes.formasPagamento);
+  // Opções de parcelamento (1x a 12x)
+  var sel = el('pdv-parcelas');
+  sel.innerHTML = '';
+  for (var n = 1; n <= 12; n++) {
+    var o = document.createElement('option');
+    o.value = n; o.textContent = n + 'x';
+    sel.appendChild(o);
+  }
   carregarSelectClientes('pdv-cliente').catch(falha);
   pdvDesenharCarrinho();
-  pdvCarregarRecentes();
+  pdvAlternarParcelas();
 }
-function pdvCarregarRecentes() {
-  rpc('listarVendas', tokenSessao, 15).then(function (vendas) {
-    el('pdv-vendas-recentes').innerHTML = tabelaHtml(
-      ['Nº', 'Data', 'Cliente', '<span class="num">Total</span>', 'Ações'],
-      vendas.map(function (v) {
-        return '<tr><td>' + v.idVenda + '</td><td>' + esc(v.data) + '</td>' +
-          '<td>' + esc(v.clienteNome) + '</td>' +
-          '<td class="num">' + moeda(v.valorTotal) + '</td>' +
-          '<td><button class="bt-cinza bt-mini" onclick="verRecibo(' +
-          v.idVenda + ')">🖨️ Ver</button> ' +
-          '<button class="bt-cinza bt-mini" onclick="baixarPdfVenda(' +
-          v.idVenda + ')">⬇️ PDF</button></td></tr>';
-      }), 'Nenhuma venda registrada ainda.');
-  }).catch(falha);
+// Mostra o campo de parcelas só no Cartão de Crédito
+function pdvAlternarParcelas() {
+  var credito = el('pdv-pagamento').value === 'Cartão de Crédito';
+  el('pdv-bloco-parcelas').style.display = credito ? 'block' : 'none';
+  if (!credito) el('pdv-parcelas').value = '1';
+  pdvMostrarValorParcela();
+}
+function pdvMostrarValorParcela() {
+  var n = parseInt(el('pdv-parcelas').value, 10) || 1;
+  var total = pdvTotalCarrinho();
+  el('pdv-valor-parcela').textContent = (n > 1 && total > 0)
+    ? n + 'x de ' + moeda(Math.round((total / n) * 100) / 100) : '';
+}
+function pdvTotalCarrinho() {
+  return carrinhoPdv.reduce(function (s, i) {
+    return s + i.quantidade * i.precoUnitario;
+  }, 0);
 }
 function pdvBuscar() {
   var termo = el('pdv-busca').value.trim();
@@ -858,6 +993,7 @@ function pdvDesenharCarrinho() {
         ')">✖</button></td></tr>';
     }), 'Carrinho vazio.');
   el('pdv-total').textContent = carrinhoPdv.length ? 'Total: ' + moeda(total) : '';
+  pdvMostrarValorParcela();
 }
 function pdvUsarCliente() {
   var c = clientePorId(el('pdv-cliente').value);
@@ -887,6 +1023,7 @@ function pdvFinalizar() {
     formaEntrega: el('pdv-entrega').value,
     enderecoEntrega: el('pdv-endereco').value,
     formaPagamento: el('pdv-pagamento').value,
+    numParcelas: el('pdv-parcelas').value,
     observacoes: el('pdv-observacoes').value,
     permitirSobEncomenda: el('pdv-sob-encomenda').checked,
     itens: carrinhoPdv.map(function (item) {
@@ -898,19 +1035,31 @@ function pdvFinalizar() {
     botao.textContent = '✅ Finalizar Venda';
     carrinhoPdv = [];
     pdvDesenharCarrinho();
+    limparCamposCliente('pdv');
     idVendaAtual = venda.idVenda;
     docAtual = venda.reciboHtml;
     el('pdv-doc').srcdoc = docAtual;
     el('pdv-doc-painel').style.display = 'block';
+    var msg = venda.aVista
+      ? ' — estoque baixado e Entrada lançada no caixa.'
+      : ' em ' + venda.numParcelas + 'x — estoque baixado; parcelas geradas ' +
+        'em Recebíveis (entram no caixa ao receber).';
     aviso('sucesso', 'Venda Nº ' + venda.idVenda + ' registrada! Total ' +
-          moeda(venda.valorTotal) +
-          ' — estoque baixado e Entrada lançada no caixa.');
-    pdvCarregarRecentes();
+          moeda(venda.valorTotal) + msg);
   }).catch(function (e) {
     botao.disabled = false;
     botao.textContent = '✅ Finalizar Venda';
     falha(e);
   });
+}
+// Limpa os campos de cliente/observações de um prefixo ('pdv' ou 'orc')
+function limparCamposCliente(pref) {
+  ['-nome', '-cpf', '-telefone', '-endereco', '-observacoes'].forEach(function (s) {
+    var e = el(pref + s);
+    if (e) e.value = '';
+  });
+  var selCli = el(pref + '-cliente');
+  if (selCli) selCli.value = '';
 }
 function pdvBaixarPdf() { baixarPdfVenda(idVendaAtual); }
 function verRecibo(idVenda) {
@@ -1170,20 +1319,27 @@ function carregarEstoque() {
   }
   rpc('listarProdutos', tokenSessao).then(function (produtos) {
     listaProdutosCache = produtos;
-    el('est-lista').innerHTML = tabelaHtml(
-      ['SKU', 'Descrição', 'Categoria', 'Estoque', 'Mínimo',
+    var titulos = ['SKU', 'Descrição', 'Categoria', 'Estoque', 'Mínimo',
        '<span class="num">Custo</span>', '<span class="num">Venda</span>',
-       'Garantia'],
+       'Garantia'];
+    if (ehAdmin) titulos.push('Ações');
+    el('est-lista').innerHTML = tabelaHtml(titulos,
       produtos.map(function (p) {
         var selo = p.quantidadeAtual <= p.quantidadeMinima
           ? 'selo-vermelho' : 'selo-verde';
+        var acoes = ehAdmin
+          ? '<td><button class="bt-cinza bt-mini" onclick="estEditar(' +
+            p.idProduto + ')">✏️</button> ' +
+            '<button class="bt-vermelho bt-mini" onclick="estExcluir(' +
+            p.idProduto + ')">🗑️</button></td>'
+          : '';
         return '<tr><td>' + esc(p.sku) + '</td><td>' + esc(p.descricao) +
           '</td><td>' + esc(p.categoria) + '</td>' +
           '<td><span class="selo ' + selo + '">' + p.quantidadeAtual +
           '</span></td><td>' + p.quantidadeMinima + '</td>' +
           '<td class="num">' + moeda(p.precoCusto) + '</td>' +
           '<td class="num">' + moeda(p.precoVenda) + '</td>' +
-          '<td>' + esc(p.statusGarantia) + '</td></tr>';
+          '<td>' + esc(p.statusGarantia) + '</td>' + acoes + '</tr>';
       }), 'Nenhum produto cadastrado.');
     if (ehAdmin) {
       var s = el('est-repor-produto');
@@ -1198,8 +1354,10 @@ function carregarEstoque() {
     }
   }).catch(falha);
 }
-function estCadastrar() {
-  rpc('cadastrarProduto', tokenSessao, {
+// Salvar decide entre cadastrar (novo) e editar (com est-id preenchido)
+function estSalvar() {
+  var id = el('est-id').value;
+  var dados = {
     sku: el('est-sku').value,
     descricao: el('est-descricao').value,
     categoria: el('est-categoria').value,
@@ -1208,13 +1366,63 @@ function estCadastrar() {
     quantidadeMinima: el('est-minimo').value,
     precoCusto: el('est-custo').value,
     precoVenda: el('est-venda').value,
-  }).then(function (r) {
-    aviso('sucesso', 'Produto cadastrado com ID ' + r.idProduto + '.');
-    ['est-sku', 'est-descricao', 'est-custo', 'est-venda'].forEach(function (id) {
-      el(id).value = '';
-    });
+  };
+  var chamada;
+  if (id) {
+    dados.idProduto = id;
+    chamada = rpc('editarProduto', tokenSessao, dados);
+  } else {
+    chamada = rpc('cadastrarProduto', tokenSessao, dados);
+  }
+  chamada.then(function (r) {
+    aviso('sucesso', id ? 'Produto atualizado.'
+      : 'Produto cadastrado com ID ' + r.idProduto + '.');
+    estLimparFormulario();
     carregarEstoque();
   }).catch(falha);
+}
+function estEditar(id) {
+  var p = listaProdutosCache.filter(function (x) {
+    return x.idProduto === Number(id);
+  })[0];
+  if (!p) return;
+  el('est-form-titulo').textContent = 'Editar produto #' + p.idProduto;
+  el('est-id').value = p.idProduto;
+  el('est-sku').value = p.sku;
+  el('est-descricao').value = p.descricao;
+  el('est-categoria').value = p.categoria;
+  el('est-garantia').value = p.statusGarantia;
+  el('est-qtd').value = p.quantidadeAtual;
+  el('est-minimo').value = p.quantidadeMinima;
+  el('est-custo').value = p.precoCusto;
+  el('est-venda').value = p.precoVenda;
+  el('est-qtd-label').textContent = 'Qtd. atual';
+  el('est-salvar').textContent = '💾 Salvar alterações';
+  el('est-form-titulo').scrollIntoView({ behavior: 'smooth' });
+}
+function estExcluir(id) {
+  var p = listaProdutosCache.filter(function (x) {
+    return x.idProduto === Number(id);
+  })[0];
+  if (!p) return;
+  if (!confirm('Excluir o produto "' + p.descricao + '"? Só é possível se ele ' +
+               'nunca foi usado em vendas ou orçamentos.')) return;
+  rpc('excluirProduto', tokenSessao, id).then(function () {
+    aviso('sucesso', 'Produto excluído.');
+    estLimparFormulario();
+    carregarEstoque();
+  }).catch(falha);
+}
+function estLimparFormulario() {
+  el('est-form-titulo').textContent = 'Cadastrar produto';
+  el('est-qtd-label').textContent = 'Qtd. inicial';
+  el('est-salvar').textContent = '💾 Cadastrar produto';
+  el('est-id').value = '';
+  ['est-sku', 'est-descricao', 'est-custo', 'est-venda'].forEach(function (id) {
+    el(id).value = '';
+  });
+  el('est-qtd').value = '0';
+  el('est-minimo').value = '0';
 }
 function estRepor() {
   rpc('reporEstoque', tokenSessao, el('est-repor-produto').value,
@@ -1271,6 +1479,50 @@ function cxCarregarExtrato() {
             '<td>' + esc(l.usuario) + '</td></tr>';
         }), 'Nenhum lançamento no período.');
     }).catch(falha);
+}
+
+// ============================ Recebíveis (parcelas) ============================
+function carregarRecebiveis() {
+  var filtro = el('rec-filtro').value;
+  rpc('listarParcelas', tokenSessao, filtro).then(function (parcelas) {
+    var totalPend = 0, qtdPend = 0, totalReceb = 0;
+    parcelas.forEach(function (p) {
+      if (p.status === 'Pendente') { totalPend += p.valor; qtdPend++; }
+      else if (p.status === 'Recebida') totalReceb += p.valor;
+    });
+    el('rec-cartoes').innerHTML =
+      cartao('A receber (mostrado)', moeda(totalPend), '#d97706') +
+      cartao('Parcelas pendentes', qtdPend) +
+      cartao('Recebido (mostrado)', moeda(totalReceb), '#16a34a');
+
+    el('rec-lista').innerHTML = tabelaHtml(
+      ['Venda', 'Cliente', 'Parcela', 'Vencimento',
+       '<span class="num">Valor</span>', 'Forma', 'Status', 'Ações'],
+      parcelas.map(function (p) {
+        var selo = p.status === 'Recebida' ? 'selo-verde'
+          : (p.status === 'Cancelada' ? 'selo-cinza' : 'selo-ambar');
+        var acao = p.status === 'Pendente'
+          ? '<button class="bt-verde bt-mini" onclick="recReceber(' +
+            p.idParcela + ')">✅ Receber</button>'
+          : (p.dataRecebimento ? '<span class="discreto">em ' +
+             esc(p.dataRecebimento) + '</span>' : '');
+        return '<tr><td>' + p.idVenda + '</td><td>' + esc(p.clienteNome) +
+          '</td><td>' + p.numero + '/' + p.totalParcelas + '</td>' +
+          '<td>' + esc(p.vencimento) + '</td>' +
+          '<td class="num">' + moeda(p.valor) + '</td>' +
+          '<td>' + esc(p.formaPagamento) + '</td>' +
+          '<td><span class="selo ' + selo + '">' + esc(p.status) +
+          '</span></td><td>' + acao + '</td></tr>';
+      }), 'Nenhuma parcela nesse filtro.');
+  }).catch(falha);
+}
+function recReceber(idParcela) {
+  if (!confirm('Confirmar o recebimento desta parcela? O valor entra no ' +
+               'fluxo de caixa.')) return;
+  rpc('receberParcela', tokenSessao, idParcela).then(function () {
+    aviso('sucesso', 'Parcela recebida e lançada no caixa.');
+    carregarRecebiveis();
+  }).catch(falha);
 }
 
 // ============================ Relatórios ============================

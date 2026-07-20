@@ -25,6 +25,11 @@ relatório gerencial.
    | `Relatorios.gs` | Script | `Relatorios.gs` |
    | `App` | HTML | `App.html` |
 
+   > 🔁 **Atualizando de uma versão anterior?** Recole **todos** os arquivos
+   > e rode de novo **⚙️ Configurar planilha** — isso cria a nova aba
+   > `Parcelas` e as colunas `Forma_Pagamento`/`Num_Parcelas` na aba `Vendas`.
+   > Vendas antigas continuam funcionando (contam como pagas à vista).
+
    > ⚠️ O arquivo HTML deve se chamar exatamente **App** (o editor acrescenta
    > o `.html` sozinho). Lembre-se: o Apps Script **não permite dois arquivos
    > com o mesmo nome**, mesmo de tipos diferentes.
@@ -43,16 +48,28 @@ relatório gerencial.
 
 ## 🖥️ Telas (menu lateral)
 
+Após o login, o sistema abre direto na tela **Vendas (PDV)**.
+
 | Tela | Quem acessa | O que faz |
 |---|---|---|
-| 📊 Dashboard | Todos | Faturamento do dia/mês, saldo do caixa (só admin), alerta de reposição, últimas vendas |
-| 🛒 Vendas (PDV) | Todos | Busca de produto, carrinho, cliente (cadastrado ou avulso), finalizar venda, recibo/pedido com impressão e **PDF** |
+| 🛒 Vendas (PDV) | Todos | Busca de produto, carrinho, cliente (cadastrado ou avulso), **parcelamento no cartão**, finalizar venda, recibo/pedido com impressão e **PDF** |
+| 📊 Dashboard | Todos | Cartões (total vendido, recebido, entradas, saídas, lucro bruto, custo do estoque, a receber, saldo), **gráfico mensal de entradas × saídas**, produtos mais vendidos e alerta de reposição — com seletor de ano. Financeiro só para admin |
 | 📄 Orçamentos | Todos | Monta orçamento (sem baixar estoque), imprime/baixa **PDF**, converte em venda ou cancela |
 | 🤝 Clientes | Todos | Cadastro e edição de clientes (nome, CPF, telefone, e-mail, endereço) |
-| 📦 Estoque | Todos (gestão só admin) | Consulta; cadastro de produto e entrada de mercadoria são do Administrador |
+| 📦 Estoque | Todos (gestão só admin) | Consulta; **cadastrar, editar e excluir** produto e entrada de mercadoria são do Administrador |
 | 💰 Fluxo de Caixa | Administrador | Lançamentos manuais e extrato com filtro por período |
+| 📥 Recebíveis | Administrador | Parcelas de vendas no cartão (contas a receber); ao **receber** uma parcela, o valor entra no caixa |
 | 📈 Relatórios | Administrador | Vendas (por pagamento, vendedor, top produtos), caixa por categoria, posição de estoque — com **PDF** |
 | 👤 Usuários | Administrador | Cadastro, redefinição de senha e ativação/desativação |
+
+### Pagamento à vista x parcelado
+
+No PDV, ao escolher **Cartão de Crédito** aparece o campo de **parcelas** (1x
+a 12x). À vista (PIX, Dinheiro, Débito ou crédito 1x), o dinheiro entra no
+caixa na hora. Parcelado (2x+), as parcelas viram **contas a receber** (tela
+📥 Recebíveis) com vencimento mensal e só entram no caixa quando você marca
+cada uma como recebida — por isso o Dashboard separa **Total vendido** de
+**Total recebido**.
 
 ## 🗂️ Abas criadas na planilha
 
@@ -62,6 +79,7 @@ relatório gerencial.
 | `Vendas` + `Itens_Venda` | Pedidos confirmados (com vendedor) e seus itens |
 | `Orcamentos` + `Itens_Orcamento` | Orçamentos com status (Aberto/Convertido/Cancelado) e vínculo com a venda gerada |
 | `Clientes` | Cadastro de clientes |
+| `Parcelas` | Contas a receber (parcelas de vendas no cartão): vencimento, valor, status e recebimento |
 | `Fluxo_Caixa` | Entradas/Saídas com forma de pagamento, venda vinculada e usuário |
 | `Usuarios` | Login, perfil e hash de senha (aba oculta; gestão pela tela 👤) |
 

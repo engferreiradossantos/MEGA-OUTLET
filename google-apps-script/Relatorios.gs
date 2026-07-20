@@ -47,60 +47,120 @@ function lerCaixa_() {
     });
 }
 
+/** Arredonda para 2 casas decimais. */
+function arredondar_(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
 
-/** Indicadores da tela inicial. */
-function dadosDashboard(token) {
+/**
+ * Indicadores da tela inicial, para o ano informado (padrão: ano atual).
+ * Métricas financeiras (entradas, saídas, recebido, lucro, custo do estoque,
+ * a receber, saldo) e os gráficos mensais só são preenchidos para o
+ * Administrador; o Vendedor recebe apenas total vendido, faturamento e os
+ * produtos mais vendidos.
+ */
+function dadosDashboard(token, ano) {
   const usuario = validarSessao_(token, PERFIS_USUARIO);
   const ehAdmin = usuario.perfil === 'Administrador';
 
+  const agora = new Date();
+  const anoSel = parseInt(ano, 10) || agora.getFullYear();
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
 
-  const vendas = lerVendas_();
-  const nomes = mapaNomesUsuarios_();
-  let faturamentoHoje = 0, faturamentoMes = 0;
-  vendas.forEach(function (v) {
+  // ----- Vendas: faturamento hoje/mês e total vendido no ano --------------
+  let faturamentoHoje = 0, faturamentoMes = 0, totalVendidoAno = 0;
+  const vendasDoAno = {};
+  lerVendas_().forEach(function (v) {
     if (v.data >= inicioMes) faturamentoMes += v.valorTotal;
     if (v.data >= hoje) faturamentoHoje += v.valorTotal;
+    if (v.data.getFullYear() === anoSel) {
+      totalVendidoAno += v.valorTotal;
+      vendasDoAno[v.idVenda] = true;
+    }
   });
 
-  let saldoCaixa = null;
+  // ----- Estoque: custo atual e alerta de reposição -----------------------
+  let custoEstoque = 0;
+  const abaixoMinimo = [];
+  lerProdutos_().forEach(function (p) {
+    custoEstoque += Math.max(0, p.quantidadeAtual) * p.precoCusto;
+    if (p.quantidadeAtual <= p.quantidadeMinima) {
+      abaixoMinimo.push({ sku: p.sku, descricao: p.descricao,
+        quantidadeAtual: p.quantidadeAtual,
+        quantidadeMinima: p.quantidadeMinima });
+    }
+  });
+
+  // ----- Produtos mais vendidos e CMV (custo) do ano ----------------------
+  const produtos = mapaProdutosPorId_();
+  const abaItens = obterAba_(ABAS.ITENS);
+  const porProduto = {};
+  let cmvAno = 0;
+  if (abaItens.getLastRow() >= 2) {
+    abaItens.getRange(2, 1, abaItens.getLastRow() - 1, 5).getValues()
+      .forEach(function (i) {
+        if (!vendasDoAno[Number(i[1])]) return;
+        const prod = produtos[Number(i[2])];
+        const qtd = Number(i[3]);
+        const chave = prod ? (prod.sku + ' — ' + prod.descricao) : 'Produto removido';
+        if (!porProduto[chave]) porProduto[chave] = { quantidade: 0, valor: 0 };
+        porProduto[chave].quantidade += qtd;
+        porProduto[chave].valor += qtd * Number(i[4]);
+        if (prod) cmvAno += qtd * prod.precoCusto;
+      });
+  }
+  const topProdutos = Object.keys(porProduto).map(function (k) {
+    return { produto: k, quantidade: porProduto[k].quantidade,
+             valor: arredondar_(porProduto[k].valor) };
+  }).sort(function (a, b) { return b.quantidade - a.quantidade; }).slice(0, 8);
+
+  // ----- Financeiro (só Administrador) ------------------------------------
+  let entradasAno = null, saidasAno = null, recebidoAno = null, lucroAno = null,
+      saldoCaixa = null, aReceber = null, serieMeses = null;
   if (ehAdmin) {
-    saldoCaixa = 0;
+    const meses = [];
+    for (let m = 0; m < 12; m++) meses.push({ mes: m + 1, entradas: 0, saidas: 0 });
+    let entradas = 0, saidas = 0, recebido = 0, saldo = 0;
     lerCaixa_().forEach(function (l) {
-      saldoCaixa += l.tipo === 'Entrada' ? l.valor : -l.valor;
+      saldo += l.tipo === 'Entrada' ? l.valor : -l.valor; // saldo global (histórico)
+      if (l.dataHora.getFullYear() !== anoSel) return;
+      const m = l.dataHora.getMonth();
+      if (l.tipo === 'Entrada') {
+        entradas += l.valor;
+        meses[m].entradas += l.valor;
+        if (l.categoria === CATEGORIA_CAIXA_VENDA) recebido += l.valor;
+      } else {
+        saidas += l.valor;
+        meses[m].saidas += l.valor;
+      }
     });
-    saldoCaixa = Math.round(saldoCaixa * 100) / 100;
+    entradasAno = arredondar_(entradas);
+    saidasAno = arredondar_(saidas);
+    recebidoAno = arredondar_(recebido);
+    saldoCaixa = arredondar_(saldo);
+    lucroAno = arredondar_(totalVendidoAno - cmvAno); // lucro bruto (venda - custo)
+    aReceber = arredondar_(lerParcelas_()
+      .filter(function (p) { return p.status === 'Pendente'; })
+      .reduce(function (s, p) { return s + p.valor; }, 0));
+    serieMeses = meses.map(function (x) {
+      return { mes: x.mes, entradas: arredondar_(x.entradas),
+               saidas: arredondar_(x.saidas) };
+    });
   }
 
-  const abaixoMinimo = lerProdutos_()
-    .filter(function (p) { return p.quantidadeAtual <= p.quantidadeMinima; })
-    .map(function (p) {
-      return { sku: p.sku, descricao: p.descricao,
-               quantidadeAtual: p.quantidadeAtual,
-               quantidadeMinima: p.quantidadeMinima };
-    });
-
-  const ultimasVendas = vendas
-    .sort(function (a, b) { return b.idVenda - a.idVenda; })
-    .slice(0, 8)
-    .map(function (v) {
-      return { idVenda: v.idVenda, data: formatarData_(v.data),
-               clienteNome: v.clienteNome, valorTotal: v.valorTotal,
-               vendedor: nomes[v.idUsuario] || '—' };
-    });
-
   return {
-    ehAdmin: ehAdmin,
-    faturamentoHoje: Math.round(faturamentoHoje * 100) / 100,
-    faturamentoMes: Math.round(faturamentoMes * 100) / 100,
-    saldoCaixa: saldoCaixa,
-    abaixoMinimo: abaixoMinimo,
-    ultimasVendas: ultimasVendas,
+    ehAdmin: ehAdmin, ano: anoSel, anoAtual: agora.getFullYear(),
+    faturamentoHoje: arredondar_(faturamentoHoje),
+    faturamentoMes: arredondar_(faturamentoMes),
+    totalVendidoAno: arredondar_(totalVendidoAno),
+    custoEstoque: ehAdmin ? arredondar_(custoEstoque) : null,
+    entradasAno: entradasAno, saidasAno: saidasAno, recebidoAno: recebidoAno,
+    lucroAno: lucroAno, saldoCaixa: saldoCaixa, aReceber: aReceber,
+    serieMeses: serieMeses, topProdutos: topProdutos, abaixoMinimo: abaixoMinimo,
   };
 }
 

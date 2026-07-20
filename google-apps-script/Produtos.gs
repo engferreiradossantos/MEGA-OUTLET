@@ -151,6 +151,95 @@ function reporEstoque(token, idProduto, quantidade) {
 }
 
 /**
+ * Edita um produto existente (exclusivo do Administrador). Aceita os mesmos
+ * campos do cadastro, mais `idProduto`. Devolve {idProduto}.
+ */
+function editarProduto(token, dados) {
+  validarSessao_(token, ['Administrador']);
+  const sku = String(dados.sku || '').trim();
+  const descricao = String(dados.descricao || '').trim();
+  if (!sku || !descricao) throw new Error('SKU e descrição são obrigatórios.');
+  if (CATEGORIAS_PRODUTO.indexOf(dados.categoria) === -1) {
+    throw new Error('Categoria inválida: ' + dados.categoria);
+  }
+  if (STATUS_GARANTIA.indexOf(dados.statusGarantia) === -1) {
+    throw new Error('Status de garantia inválido: ' + dados.statusGarantia);
+  }
+  const minimo = Math.max(0, parseInt(dados.quantidadeMinima, 10) || 0);
+  const custo = Math.max(0, Number(dados.precoCusto) || 0);
+  const venda = Math.max(0, Number(dados.precoVenda) || 0);
+  const qtd = parseInt(dados.quantidadeAtual, 10);
+
+  const bloqueio = LockService.getScriptLock();
+  bloqueio.waitLock(30000);
+  try {
+    const produtos = lerProdutos_();
+    const produto = produtos.filter(function (p) {
+      return p.idProduto === Number(dados.idProduto);
+    })[0];
+    if (!produto) throw new Error('Produto ' + dados.idProduto + ' não encontrado.');
+
+    // SKU deve continuar único (ignorando o próprio produto)
+    const colisao = produtos.some(function (p) {
+      return p.sku === sku && p.idProduto !== produto.idProduto;
+    });
+    if (colisao) throw new Error('Já existe outro produto com o SKU "' + sku + '".');
+
+    const aba = obterAba_(ABAS.PRODUTOS);
+    // Mantém a quantidade atual se o campo vier vazio/ inválido
+    const novaQtd = isNaN(qtd) ? produto.quantidadeAtual : qtd;
+    aba.getRange(produto.linha, 2, 1, 8).setValues([[
+      sku, descricao, dados.categoria, novaQtd, minimo,
+      Math.round(custo * 100) / 100, Math.round(venda * 100) / 100,
+      dados.statusGarantia,
+    ]]);
+    SpreadsheetApp.flush();
+    return { idProduto: produto.idProduto };
+  } finally {
+    bloqueio.releaseLock();
+  }
+}
+
+/**
+ * Exclui um produto (exclusivo do Administrador). Para preservar o histórico,
+ * a exclusão é BLOQUEADA se o produto já aparece em vendas ou orçamentos —
+ * nesse caso, oriente a editar/zerar o estoque em vez de excluir.
+ */
+function excluirProduto(token, idProduto) {
+  validarSessao_(token, ['Administrador']);
+  const bloqueio = LockService.getScriptLock();
+  bloqueio.waitLock(30000);
+  try {
+    const produto = lerProdutos_().filter(function (p) {
+      return p.idProduto === Number(idProduto);
+    })[0];
+    if (!produto) throw new Error('Produto ' + idProduto + ' não encontrado.');
+
+    if (produtoTemMovimento_(idProduto)) {
+      throw new Error('Este produto já foi usado em vendas ou orçamentos e ' +
+        'não pode ser excluído (o histórico seria perdido). Se ele saiu de ' +
+        'linha, edite-o e deixe o estoque em 0.');
+    }
+    obterAba_(ABAS.PRODUTOS).deleteRow(produto.linha);
+    SpreadsheetApp.flush();
+    return { ok: true };
+  } finally {
+    bloqueio.releaseLock();
+  }
+}
+
+/** True se o produto aparece em algum item de venda ou de orçamento. */
+function produtoTemMovimento_(idProduto) {
+  const checa = function (nomeAba) {
+    const aba = obterAba_(nomeAba);
+    if (aba.getLastRow() < 2) return false;
+    return aba.getRange(2, 3, aba.getLastRow() - 1, 1).getValues()
+      .some(function (linha) { return Number(linha[0]) === Number(idProduto); });
+  };
+  return checa(ABAS.ITENS) || checa(ABAS.ITENS_ORC);
+}
+
+/**
  * Insere produtos de demonstração (menu 🏬 MEGA OUTLET).
  * Idempotente: SKUs já cadastrados são ignorados. Função de MENU: o
  * getUi() na primeira linha impede execução via App da Web sem login.

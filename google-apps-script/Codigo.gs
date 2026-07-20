@@ -23,6 +23,7 @@ const ABAS = {
   CLIENTES: 'Clientes',       // cadastro de clientes
   ORCAMENTOS: 'Orcamentos',   // orçamentos/pedidos (não baixam estoque)
   ITENS_ORC: 'Itens_Orcamento',
+  PARCELAS: 'Parcelas',       // contas a receber (parcelas de vendas no cartão)
   USUARIOS: 'Usuarios',       // usuários do sistema (login, senha, perfil)
 };
 // Observação: o Dashboard NÃO é uma aba da planilha — ele existe apenas
@@ -35,7 +36,8 @@ const CABECALHOS = {
                     'Preco_Custo', 'Preco_Venda', 'Status_Garantia'],
   [ABAS.VENDAS]:   ['ID_Venda', 'Data_Venda', 'Cliente_Nome', 'Cliente_CPF',
                     'Cliente_Telefone', 'Forma_Entrega', 'Endereco_Entrega',
-                    'Valor_Total', 'Observacoes', 'ID_Usuario'],
+                    'Valor_Total', 'Observacoes', 'ID_Usuario',
+                    'Forma_Pagamento', 'Num_Parcelas'],
   [ABAS.ITENS]:    ['ID_Item', 'ID_Venda', 'ID_Produto', 'Quantidade',
                     'Preco_Unitario_Aplicado'],
   [ABAS.CAIXA]:    ['ID_Lancamento', 'Data_Hora', 'Tipo', 'Categoria',
@@ -48,9 +50,15 @@ const CABECALHOS = {
                       'Observacoes', 'Status', 'ID_Usuario', 'ID_Venda'],
   [ABAS.ITENS_ORC]: ['ID_Item', 'ID_Orcamento', 'ID_Produto', 'Quantidade',
                      'Preco_Unitario'],
+  [ABAS.PARCELAS]: ['ID_Parcela', 'ID_Venda', 'Numero', 'Total_Parcelas',
+                    'Vencimento', 'Valor', 'Status', 'Data_Recebimento',
+                    'Forma_Pagamento'],
   [ABAS.USUARIOS]: ['ID_Usuario', 'Login', 'Nome', 'Perfil', 'Ativo',
                     'Salt', 'Senha_Hash'],
 };
+
+// Situações possíveis de uma parcela (conta a receber)
+const STATUS_PARCELA = ['Pendente', 'Recebida', 'Cancelada'];
 
 // Situações possíveis de um orçamento
 const STATUS_ORCAMENTO = ['Aberto', 'Convertido', 'Cancelado'];
@@ -78,12 +86,12 @@ const PERFIS_USUARIO = ['Administrador', 'Vendedor'];
 const AVISO_LEGAL_OUTLET =
   'Peças vendidas no estado em que se encontram, sem troca e sem garantia.';
 
-// Dados exibidos no cabeçalho do recibo (requisito 4)
+// Dados exibidos no cabeçalho do recibo, orçamento e relatório
 const DADOS_LOJA = {
   nome: 'MEGA OUTLET — Móveis e Eletroeletrônicos',
-  cnpj: '00.000.000/0000-00',            // TODO: preencher com o CNPJ real
-  endereco: 'Rua Exemplo, 123 — Centro — Cidade/UF',
-  telefone: '(00) 00000-0000',
+  cnpj: '45.892.255/0001-44',
+  endereco: 'Avenida Santana, 889 — Jardim Amanda I — Hortolândia/SP',
+  telefone: '(19) 99113-2683',
 };
 
 // ---------------------------------------------------------------------------
@@ -194,6 +202,7 @@ function configurarPlanilha() {
   const abaVendas = planilha.getSheetByName(ABAS.VENDAS);
   const abaCaixa = planilha.getSheetByName(ABAS.CAIXA);
   const abaOrcamentos = planilha.getSheetByName(ABAS.ORCAMENTOS);
+  const abaParcelas = planilha.getSheetByName(ABAS.PARCELAS);
   const abaUsuarios = planilha.getSheetByName(ABAS.USUARIOS);
 
   // ----- Validações de dados (listas suspensas dos enums) -----------------
@@ -205,6 +214,8 @@ function configurarPlanilha() {
   aplicarListaSuspensa_(abaCaixa.getRange('F2:F'), FORMAS_PAGAMENTO, false);
   aplicarListaSuspensa_(abaOrcamentos.getRange('G2:G'), FORMAS_ENTREGA, false);
   aplicarListaSuspensa_(abaOrcamentos.getRange('K2:K'), STATUS_ORCAMENTO, false);
+  aplicarListaSuspensa_(abaParcelas.getRange('G2:G'), STATUS_PARCELA, false);
+  aplicarListaSuspensa_(abaParcelas.getRange('I2:I'), FORMAS_PAGAMENTO, false);
   aplicarListaSuspensa_(abaUsuarios.getRange('D2:D'), PERFIS_USUARIO, false);
   aplicarListaSuspensa_(abaUsuarios.getRange('E2:E'), ['Sim', 'Não'], false);
 
@@ -220,6 +231,9 @@ function configurarPlanilha() {
   abaCaixa.getRange('E2:E').setNumberFormat('"R$" #,##0.00');
   abaOrcamentos.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
   abaOrcamentos.getRange('I2:I').setNumberFormat('"R$" #,##0.00');
+  abaParcelas.getRange('E2:E').setNumberFormat('dd/mm/yyyy');   // Vencimento
+  abaParcelas.getRange('F2:F').setNumberFormat('"R$" #,##0.00'); // Valor
+  abaParcelas.getRange('H2:H').setNumberFormat('dd/mm/yyyy');   // Recebimento
 
   // Remove uma eventual aba "Dashboard" de versões anteriores — o Dashboard
   // agora vive apenas no sistema (tela 📊 do App.html), não na planilha.

@@ -58,6 +58,14 @@ function registrarVenda(dados) {
     if (FORMAS_ENTREGA.indexOf(dados.formaEntrega) === -1) {
       throw new Error('Forma de entrega inválida: ' + dados.formaEntrega);
     }
+    // Parcelamento: só faz sentido no Cartão de Crédito. Nas demais formas
+    // (PIX, Dinheiro, Débito) e no crédito à vista, a venda é "à vista" (1x)
+    // e o dinheiro entra no caixa na hora. No crédito parcelado (>1x), as
+    // parcelas viram contas a receber e só entram no caixa quando recebidas.
+    let numParcelas = Math.max(1, parseInt(dados.numParcelas, 10) || 1);
+    if (dados.formaPagamento !== 'Cartão de Crédito') numParcelas = 1;
+    if (numParcelas > 36) throw new Error('Número de parcelas muito alto (máx. 36).');
+    const aVista = numParcelas === 1;
     const enderecoEntrega = String(dados.enderecoEntrega || '').trim();
     if (dados.formaEntrega !== 'Retira' && !enderecoEntrega) {
       throw new Error('Endereço de entrega é obrigatório para "' +
@@ -132,7 +140,7 @@ function registrarVenda(dados) {
       String(dados.clienteCpf || '').trim(),
       String(dados.clienteTelefone || '').trim(),
       dados.formaEntrega, enderecoEntrega, valorTotal, observacoes,
-      operador.idUsuario,
+      operador.idUsuario, dados.formaPagamento, numParcelas,
     ]);
 
     // 4b) Itens da venda (aba Itens_Venda — requisito 2.4), em lote
@@ -152,15 +160,20 @@ function registrarVenda(dados) {
         .setValue(produto.quantidadeAtual - Number(item.quantidade));
     });
 
-    // 4d) Entrada automática no Fluxo_Caixa (regra 3.2), herdando o
-    //     valor total e a forma de pagamento da venda
-    inserirLancamentoCaixa_({
-      tipo: 'Entrada',
-      categoria: CATEGORIA_CAIXA_VENDA,
-      valor: valorTotal,
-      formaPagamento: dados.formaPagamento,
+    // 4d) Pagamento: gera parcelas e movimenta o caixa (ver Caixa.gs).
+    //  - à vista (1x): registra a Entrada no caixa AGORA e uma parcela já
+    //    marcada como Recebida;
+    //  - parcelado no cartão (>1x): cria as parcelas como "Pendente" (contas
+    //    a receber) e NÃO lança no caixa — cada parcela entra no caixa quando
+    //    for recebida (tela de Recebíveis).
+    registrarParcelasDaVenda_({
       idVenda: idVenda,
+      valorTotal: valorTotal,
+      formaPagamento: dados.formaPagamento,
+      numParcelas: numParcelas,
+      dataVenda: hoje,
       idUsuario: operador.idUsuario,
+      aVista: aVista,
     });
 
     SpreadsheetApp.flush(); // garante a persistência antes de liberar o lock
@@ -168,6 +181,8 @@ function registrarVenda(dados) {
     return {
       idVenda: idVenda,
       valorTotal: valorTotal,
+      numParcelas: numParcelas,
+      aVista: aVista,
       reciboHtml: gerarReciboHtml_(idVenda),
     };
   } finally {
@@ -229,7 +244,7 @@ function gerarReciboHtml_(idVenda) {
   // ----- Cabeçalho da venda ------------------------------------------------
   const abaVendas = obterAba_(ABAS.VENDAS);
   const dadosVendas = abaVendas.getLastRow() < 2 ? [] :
-    abaVendas.getRange(2, 1, abaVendas.getLastRow() - 1, 10).getValues();
+    abaVendas.getRange(2, 1, abaVendas.getLastRow() - 1, 12).getValues();
   const venda = dadosVendas.filter(function (v) {
     return Number(v[0]) === idVenda;
   })[0];
@@ -245,14 +260,15 @@ function gerarReciboHtml_(idVenda) {
     abaItens.getRange(2, 1, abaItens.getLastRow() - 1, 5).getValues())
     .filter(function (i) { return Number(i[1]) === idVenda; });
 
-  // ----- Forma de pagamento (está na Entrada vinculada do Fluxo_Caixa) -----
-  const abaCaixa = obterAba_(ABAS.CAIXA);
-  const lancamento = (abaCaixa.getLastRow() < 2 ? [] :
-    abaCaixa.getRange(2, 1, abaCaixa.getLastRow() - 1, 8).getValues())
-    .filter(function (l) {
-      return Number(l[6]) === idVenda && l[2] === 'Entrada';
-    })[0];
-  const formaPagamento = lancamento ? String(lancamento[5]) : '—';
+  // ----- Forma de pagamento (guardada na própria venda) --------------------
+  const formaPagamento = String(venda[10] || '—');
+  const numParcelas = Number(venda[11]) || 1;
+  let descricaoPagamento = escaparHtml_(formaPagamento);
+  if (numParcelas > 1) {
+    const valorParcela = Math.round((Number(venda[7]) / numParcelas) * 100) / 100;
+    descricaoPagamento += ' em ' + numParcelas + 'x de ' +
+      formatarMoeda_(valorParcela);
+  }
 
   // ----- Montagem do HTML --------------------------------------------------
   const linhasItens = itens.map(function (i) {
@@ -314,7 +330,7 @@ function gerarReciboHtml_(idVenda) {
     '<strong>CPF:</strong> ' + escaparHtml_(venda[3] || '—') +
     ' | <strong>Telefone:</strong> ' + escaparHtml_(venda[4] || '—') + '<br>' +
     '<strong>Entrega:</strong> ' + entrega + '<br>' +
-    '<strong>Forma de pagamento:</strong> ' + escaparHtml_(formaPagamento) + '<br>' +
+    '<strong>Forma de pagamento:</strong> ' + descricaoPagamento + '<br>' +
     '<strong>Atendido por:</strong> ' + escaparHtml_(nomeVendedor) +
     '</div>' +
     '<h2>Itens</h2>' +
