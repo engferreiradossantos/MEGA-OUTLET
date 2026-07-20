@@ -509,6 +509,36 @@ var carrinhoPdv = [], buscaPdv = [];
 var carrinhoOrc = [], buscaOrc = [];
 var listaClientes = [], listaUsuarios = [], listaProdutosCache = [];
 
+// Arquivo .gs onde cada função de servidor está definida. Usado para dar
+// uma mensagem EXATA de qual arquivo recolar quando algo estiver faltando.
+var ARQUIVO_DA_FUNCAO = {
+  existeAlgumUsuario: 'Usuarios.gs', criarAdministradorInicial: 'Usuarios.gs',
+  loginUsuario: 'Usuarios.gs', encerrarSessao: 'Usuarios.gs',
+  listarUsuarios: 'Usuarios.gs', criarUsuario: 'Usuarios.gs',
+  definirSenha: 'Usuarios.gs', definirAtivo: 'Usuarios.gs',
+  obterOpcoesFormularios: 'Caixa.gs', registrarLancamentoManual: 'Caixa.gs',
+  extratoCaixa: 'Caixa.gs',
+  buscarProdutos: 'Produtos.gs', listarProdutos: 'Produtos.gs',
+  cadastrarProduto: 'Produtos.gs', reporEstoque: 'Produtos.gs',
+  registrarVenda: 'Vendas.gs', listarVendas: 'Vendas.gs',
+  obterReciboHtml: 'Vendas.gs', gerarPdfRecibo: 'Vendas.gs',
+  listarClientes: 'Clientes.gs', buscarClientes: 'Clientes.gs',
+  salvarCliente: 'Clientes.gs',
+  criarOrcamento: 'Orcamentos.gs', listarOrcamentos: 'Orcamentos.gs',
+  obterOrcamentoHtml: 'Orcamentos.gs', gerarPdfOrcamento: 'Orcamentos.gs',
+  converterOrcamentoEmVenda: 'Orcamentos.gs', cancelarOrcamento: 'Orcamentos.gs',
+  dadosDashboard: 'Relatorios.gs', relatorioDados: 'Relatorios.gs',
+  gerarPdfRelatorio: 'Relatorios.gs',
+};
+
+// true se a função de servidor está publicada no projeto do Apps Script.
+function funcaoServidorExiste(nome) {
+  var runner = google.script.run
+    .withSuccessHandler(function () {})
+    .withFailureHandler(function () {});
+  return typeof runner[nome] === 'function';
+}
+
 // Chamada ao servidor com Promise (google.script.run).
 // Importante: o google.script.run NÃO aceita .apply()/.call() nos seus
 // métodos — é preciso invocar diretamente runner[funcao](arg1, arg2, ...).
@@ -519,10 +549,11 @@ function rpc(funcao) {
       .withSuccessHandler(resolve)
       .withFailureHandler(reject);
     if (typeof runner[funcao] !== 'function') {
-      reject(new Error('Função de servidor "' + funcao + '" indisponível. ' +
-        'Confirme que TODOS os arquivos .gs foram colados no projeto do ' +
-        'Apps Script (Codigo, Produtos, Vendas, Caixa, Usuarios, Clientes, ' +
-        'Orcamentos, Relatorios).'));
+      var arquivo = ARQUIVO_DA_FUNCAO[funcao] || 'o arquivo .gs correspondente';
+      reject(new Error('A função "' + funcao + '" não está no projeto. ' +
+        'Recole o arquivo ' + arquivo + ' (versão atual) no editor do Apps ' +
+        'Script e salve (Ctrl+S). Se você abre o sistema pela URL (App da ' +
+        'Web), crie uma NOVA implantação depois de colar.'));
       return;
     }
     // Chamada direta (método do runner) — jamais via apply/call
@@ -535,6 +566,23 @@ function rpc(funcao) {
       default: runner[funcao](args[0], args[1], args[2], args[3], args[4]);
     }
   });
+}
+
+// Verifica, de uma só vez, se todas as funções de servidor estão publicadas.
+// Se faltar algo, mostra um aviso claro com os arquivos a recolar — assim o
+// usuário corrige tudo antes de esbarrar num erro tela por tela.
+function verificarInstalacao() {
+  var faltando = {};
+  Object.keys(ARQUIVO_DA_FUNCAO).forEach(function (nome) {
+    if (!funcaoServidorExiste(nome)) faltando[ARQUIVO_DA_FUNCAO[nome]] = true;
+  });
+  var arquivos = Object.keys(faltando);
+  if (arquivos.length) {
+    aviso('erro', '⚠️ Instalação incompleta. Recole e salve no editor do ' +
+      'Apps Script os arquivos: ' + arquivos.join(', ') + '. Depois recarregue ' +
+      'o sistema. (Se você usa a URL do App da Web, crie uma NOVA implantação.)');
+  }
+  return arquivos.length === 0;
 }
 
 function moeda(v) {
@@ -620,6 +668,7 @@ function aoLogar(sessao) {
     opcoes = o;
     montarMenu();
     abrirTela('dashboard');
+    verificarInstalacao(); // avisa (sem travar) se faltar algum arquivo .gs
   }).catch(falha);
 }
 function sair() {

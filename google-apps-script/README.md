@@ -109,6 +109,23 @@ conversor nativo do Apps Script (HTML → PDF) e baixados direto pelo navegador.
 > aponta para uma versão antiga do código — edite a implantação e selecione
 > a nova versão (ou crie uma nova implantação).
 
+## 🩺 "A função X não está no projeto" / "indisponível"
+
+Essa mensagem significa que **algum arquivo `.gs` não foi colado (ou está
+desatualizado)** no editor do Apps Script — o sistema chama uma função que
+ainda não existe no seu projeto. Ao fazer login, o sistema já verifica tudo
+de uma vez e lista **exatamente quais arquivos recolar**. Para resolver:
+
+1. No editor do Apps Script, abra o arquivo indicado (ex.: `Produtos.gs`) e
+   **substitua todo o conteúdo** pela versão desta pasta;
+2. **Salve** (Ctrl+S) e **recarregue** o sistema;
+3. Se você usa o sistema pela **URL do App da Web**, crie uma **NOVA
+   implantação** depois de colar (a URL antiga continua na versão anterior).
+
+Confira sempre se os **8 arquivos `.gs`** (Codigo, Produtos, Vendas, Caixa,
+Usuarios, Clientes, Orcamentos, Relatorios) e o **App.html** estão todos na
+versão atual.
+
 ## 🏪 Personalização
 
 Edite a constante `DADOS_LOJA` no topo de `Codigo.gs` com nome, CNPJ,
