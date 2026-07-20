@@ -77,6 +77,79 @@ function produtoEhOutlet_(statusGarantia) {
          status.indexOf('sem garantia') !== -1;
 }
 
+/** Lista todo o cadastro de produtos (qualquer perfil logado). */
+function listarProdutos(token) {
+  validarSessao_(token, PERFIS_USUARIO);
+  return lerProdutos_().map(function (p) {
+    return { idProduto: p.idProduto, sku: p.sku, descricao: p.descricao,
+             categoria: p.categoria, quantidadeAtual: p.quantidadeAtual,
+             quantidadeMinima: p.quantidadeMinima, precoCusto: p.precoCusto,
+             precoVenda: p.precoVenda, statusGarantia: p.statusGarantia };
+  });
+}
+
+/** Cadastra um produto (exclusivo do Administrador). Devolve {idProduto}. */
+function cadastrarProduto(token, dados) {
+  validarSessao_(token, ['Administrador']);
+  const sku = String(dados.sku || '').trim();
+  const descricao = String(dados.descricao || '').trim();
+  if (!sku || !descricao) throw new Error('SKU e descrição são obrigatórios.');
+  if (CATEGORIAS_PRODUTO.indexOf(dados.categoria) === -1) {
+    throw new Error('Categoria inválida: ' + dados.categoria);
+  }
+  if (STATUS_GARANTIA.indexOf(dados.statusGarantia) === -1) {
+    throw new Error('Status de garantia inválido: ' + dados.statusGarantia);
+  }
+  const quantidade = Math.max(0, parseInt(dados.quantidadeAtual, 10) || 0);
+  const minimo = Math.max(0, parseInt(dados.quantidadeMinima, 10) || 0);
+  const custo = Math.max(0, Number(dados.precoCusto) || 0);
+  const venda = Math.max(0, Number(dados.precoVenda) || 0);
+
+  const bloqueio = LockService.getScriptLock();
+  bloqueio.waitLock(30000);
+  try {
+    const jaExiste = lerProdutos_().some(function (p) { return p.sku === sku; });
+    if (jaExiste) throw new Error('Já existe um produto com o SKU "' + sku + '".');
+
+    const aba = obterAba_(ABAS.PRODUTOS);
+    const id = proximoId_(aba);
+    aba.appendRow([id, sku, descricao, dados.categoria, quantidade, minimo,
+                   Math.round(custo * 100) / 100, Math.round(venda * 100) / 100,
+                   dados.statusGarantia]);
+    SpreadsheetApp.flush();
+    return { idProduto: id };
+  } finally {
+    bloqueio.releaseLock();
+  }
+}
+
+/**
+ * Entrada de mercadoria: soma `quantidade` ao saldo do produto
+ * (exclusivo do Administrador). Devolve {novoSaldo}.
+ */
+function reporEstoque(token, idProduto, quantidade) {
+  validarSessao_(token, ['Administrador']);
+  quantidade = parseInt(quantidade, 10);
+  if (!quantidade || quantidade <= 0) {
+    throw new Error('A quantidade de reposição deve ser maior que zero.');
+  }
+  const bloqueio = LockService.getScriptLock();
+  bloqueio.waitLock(30000);
+  try {
+    const produto = lerProdutos_().filter(function (p) {
+      return p.idProduto === Number(idProduto);
+    })[0];
+    if (!produto) throw new Error('Produto ' + idProduto + ' não encontrado.');
+    const novoSaldo = produto.quantidadeAtual + quantidade;
+    obterAba_(ABAS.PRODUTOS)
+      .getRange(produto.linha, COL_PROD.QTD_ATUAL + 1).setValue(novoSaldo);
+    SpreadsheetApp.flush();
+    return { novoSaldo: novoSaldo };
+  } finally {
+    bloqueio.releaseLock();
+  }
+}
+
 /**
  * Insere produtos de demonstração (menu 🏬 MEGA OUTLET).
  * Idempotente: SKUs já cadastrados são ignorados. Função de MENU: o

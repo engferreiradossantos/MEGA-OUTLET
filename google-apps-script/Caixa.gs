@@ -59,12 +59,46 @@ function registrarLancamentoManual(dados) {
   }
 }
 
-/** Listas de opções para os formulários HTML (PDV e Lançamento manual). */
+/**
+ * Extrato do caixa (mais recentes primeiro), com filtro opcional por
+ * período ('YYYY-MM-DD'). Exclusivo do Administrador.
+ */
+function extratoCaixa(token, dataInicio, dataFim) {
+  validarSessao_(token, ['Administrador']);
+  const nomes = mapaNomesUsuarios_();
+  let inicio = null, fim = null;
+  if (dataInicio) inicio = parseDataIso_(dataInicio);
+  if (dataFim) { fim = parseDataIso_(dataFim); fim.setHours(23, 59, 59, 999); }
+
+  return lerCaixa_()
+    .filter(function (l) {
+      if (inicio && l.dataHora < inicio) return false;
+      if (fim && l.dataHora > fim) return false;
+      return true;
+    })
+    .sort(function (a, b) { return b.idLancamento - a.idLancamento; })
+    .slice(0, 300)
+    .map(function (l) {
+      return {
+        idLancamento: l.idLancamento,
+        dataHora: Utilities.formatDate(l.dataHora,
+          Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'),
+        tipo: l.tipo, categoria: l.categoria, valor: l.valor,
+        formaPagamento: l.formaPagamento, idVenda: l.idVenda,
+        usuario: nomes[l.idUsuario] || '—',
+      };
+    });
+}
+
+/** Listas de opções para os formulários do aplicativo. */
 function obterOpcoesFormularios() {
   return {
     formasPagamento: FORMAS_PAGAMENTO,
     formasEntrega: FORMAS_ENTREGA,
     tiposLancamento: TIPOS_LANCAMENTO,
     categoriasCaixa: CATEGORIAS_CAIXA,
+    categoriasProduto: CATEGORIAS_PRODUTO,
+    statusGarantia: STATUS_GARANTIA,
+    perfisUsuario: PERFIS_USUARIO,
   };
 }

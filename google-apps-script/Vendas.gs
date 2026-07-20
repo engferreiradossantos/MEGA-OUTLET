@@ -176,6 +176,44 @@ function registrarVenda(dados) {
 }
 
 // ---------------------------------------------------------------------------
+// Consulta de vendas e documentos (recibo/pedido em HTML e PDF)
+// ---------------------------------------------------------------------------
+
+/** Vendas mais recentes primeiro (qualquer perfil logado). */
+function listarVendas(token, limite) {
+  validarSessao_(token, PERFIS_USUARIO);
+  const nomes = mapaNomesUsuarios_();
+  const aba = obterAba_(ABAS.VENDAS);
+  const ultimaLinha = aba.getLastRow();
+  if (ultimaLinha < 2) return [];
+  return aba.getRange(2, 1, ultimaLinha - 1, 10).getValues()
+    .filter(function (v) { return v[0] !== ''; })
+    .map(function (v) {
+      return { idVenda: Number(v[0]), data: formatarData_(v[1]),
+               clienteNome: String(v[2]), valorTotal: Number(v[7]) || 0,
+               vendedor: nomes[Number(v[9])] || '—' };
+    })
+    .sort(function (a, b) { return b.idVenda - a.idVenda; })
+    .slice(0, limite || 100);
+}
+
+/** Recibo/pedido em HTML para visualizar/imprimir — exige sessão. */
+function obterReciboHtml(token, idVenda) {
+  validarSessao_(token, PERFIS_USUARIO);
+  return gerarReciboHtml_(idVenda);
+}
+
+/** Recibo/pedido em PDF (base64 para download) — exige sessão. */
+function gerarPdfRecibo(token, idVenda) {
+  validarSessao_(token, PERFIS_USUARIO);
+  const numero = ('000000' + Number(idVenda)).slice(-6);
+  return converterHtmlEmPdf_(
+    gerarReciboHtml_(idVenda),
+    'Pedido/Recibo Nº ' + numero + ' — MEGA OUTLET',
+    'pedido_' + numero);
+}
+
+// ---------------------------------------------------------------------------
 // Gerador de Recibo (requisito 4)
 // ---------------------------------------------------------------------------
 

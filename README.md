@@ -7,11 +7,15 @@ disponível em **duas implementações**:
 | Versão | Tecnologia | Onde está | Como usar |
 |---|---|---|---|
 | **Web local** | Python + Streamlit + SQLite | raiz deste repositório | instruções abaixo |
-| **Google Sheets** | Google Apps Script + HTML/CSS | pasta [`google-apps-script/`](google-apps-script/) | [guia de instalação](google-apps-script/README.md) |
+| **Google Sheets** ⭐ | Google Apps Script + HTML/CSS | pasta [`google-apps-script/`](google-apps-script/) | [guia de instalação](google-apps-script/README.md) |
 
-As duas versões implementam as mesmas regras de negócio (baixa automática de
-estoque, entrada automática no caixa, venda sob encomenda e aviso legal de
-outlet). O restante deste README descreve a **versão Python/Streamlit**.
+⭐ A versão Google Sheets é a mais completa: aplicativo único estilo ERP com
+**menu lateral** (Dashboard, Vendas/PDV, Orçamentos, Clientes, Estoque,
+Fluxo de Caixa, Relatórios e Usuários), login por perfil e **PDF** de
+pedido/recibo, orçamento e relatório gerencial. As duas versões compartilham
+as mesmas regras de negócio (baixa automática de estoque, entrada automática
+no caixa, venda sob encomenda e aviso legal de outlet). O restante deste
+README descreve a **versão Python/Streamlit**.
 
 ## Como executar
 

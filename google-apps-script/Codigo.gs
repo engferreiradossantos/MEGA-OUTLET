@@ -20,6 +20,9 @@ const ABAS = {
   VENDAS: 'Vendas',           // 2.3 Vendas e Pedidos
   ITENS: 'Itens_Venda',       // 2.4 Itens da Venda (tabela relacional)
   CAIXA: 'Fluxo_Caixa',       // 2.2 Fluxo de Caixa
+  CLIENTES: 'Clientes',       // cadastro de clientes
+  ORCAMENTOS: 'Orcamentos',   // orçamentos/pedidos (não baixam estoque)
+  ITENS_ORC: 'Itens_Orcamento',
   USUARIOS: 'Usuarios',       // usuários do sistema (login, senha, perfil)
   DASHBOARD: 'Dashboard',     // requisito 4 — indicadores
 };
@@ -36,9 +39,20 @@ const CABECALHOS = {
                     'Preco_Unitario_Aplicado'],
   [ABAS.CAIXA]:    ['ID_Lancamento', 'Data_Hora', 'Tipo', 'Categoria',
                     'Valor', 'Forma_Pagamento', 'ID_Venda', 'ID_Usuario'],
+  [ABAS.CLIENTES]: ['ID_Cliente', 'Nome', 'CPF', 'Telefone', 'Email',
+                    'Endereco', 'Observacoes'],
+  [ABAS.ORCAMENTOS]: ['ID_Orcamento', 'Data', 'Validade_Dias',
+                      'Cliente_Nome', 'Cliente_CPF', 'Cliente_Telefone',
+                      'Forma_Entrega', 'Endereco_Entrega', 'Valor_Total',
+                      'Observacoes', 'Status', 'ID_Usuario', 'ID_Venda'],
+  [ABAS.ITENS_ORC]: ['ID_Item', 'ID_Orcamento', 'ID_Produto', 'Quantidade',
+                     'Preco_Unitario'],
   [ABAS.USUARIOS]: ['ID_Usuario', 'Login', 'Nome', 'Perfil', 'Ativo',
                     'Salt', 'Senha_Hash'],
 };
+
+// Situações possíveis de um orçamento
+const STATUS_ORCAMENTO = ['Aberto', 'Convertido', 'Cancelado'];
 
 // ---------------------------------------------------------------------------
 // Enums de domínio (requisito 2)
@@ -77,32 +91,48 @@ const DADOS_LOJA = {
 
 /**
  * Ponto de entrada quando o projeto é publicado como App da Web
- * (Implantar → Nova implantação → App da Web). Serve as telas do sistema
- * fora da planilha, pela URL da implantação:
- *
- *   .../exec                    → PDV (tela padrão)
- *   .../exec?pagina=caixa       → Lançamento manual no caixa
- *   .../exec?pagina=usuarios    → Gestão de usuários
+ * (Implantar → Nova implantação → App da Web). Serve o sistema completo
+ * (App.html: menu lateral com Dashboard, Vendas, Orçamentos, Clientes,
+ * Estoque, Caixa, Relatórios e Usuários) pela URL da implantação.
  *
  * Recomendação ao implantar: "Executar como: Eu" e restrinja "Quem pode
  * acessar" às pessoas da loja — o login/senha do sistema continua sendo
  * exigido em todas as operações de qualquer forma.
  *
- * Usar como App da Web é OPCIONAL: dentro da planilha tudo funciona pelo
- * menu 🏬 MEGA OUTLET, sem precisar implantar nada.
+ * Usar como App da Web é OPCIONAL: dentro da planilha o mesmo sistema abre
+ * pelo menu 🏬 MEGA OUTLET → 🚀 Abrir sistema.
  */
-function doGet(e) {
-  const pagina = String((e && e.parameter && e.parameter.pagina) || 'pdv')
-    .toLowerCase();
-  const telas = {
-    pdv: { arquivo: 'PDV', titulo: '🛒 PDV — MEGA OUTLET' },
-    caixa: { arquivo: 'Lancamento', titulo: '💰 Caixa — MEGA OUTLET' },
-    usuarios: { arquivo: 'TelaUsuarios', titulo: '👤 Usuários — MEGA OUTLET' },
-  };
-  const tela = telas[pagina] || telas.pdv;
-  return HtmlService.createHtmlOutputFromFile(tela.arquivo)
-    .setTitle(tela.titulo)
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('App')
+    .setTitle('MEGA OUTLET — Sistema de Gestão')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// ---------------------------------------------------------------------------
+// Geração de PDF (pedido/recibo, orçamento e relatórios)
+// ---------------------------------------------------------------------------
+
+/** Envolve um corpo HTML em um documento completo (charset p/ acentos). */
+function documentoHtmlCompleto_(corpo, titulo) {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' +
+         escaparHtml_(titulo) + '</title></head><body>' + corpo +
+         '</body></html>';
+}
+
+/**
+ * Converte HTML em PDF usando o conversor nativo do Apps Script
+ * (Blob HTML → getAs PDF). Devolve o arquivo em base64, pronto para o
+ * navegador baixar via data URI.
+ */
+function converterHtmlEmPdf_(corpoHtml, titulo, nomeArquivo) {
+  const pdf = Utilities.newBlob(
+      documentoHtmlCompleto_(corpoHtml, titulo), 'text/html', nomeArquivo)
+    .getAs('application/pdf')
+    .setName(nomeArquivo + '.pdf');
+  return {
+    base64: Utilities.base64Encode(pdf.getBytes()),
+    nomeArquivo: nomeArquivo + '.pdf',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -113,68 +143,22 @@ function doGet(e) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🏬 MEGA OUTLET')
-    .addItem('🛒 Abrir PDV (Frente de Caixa)', 'abrirPdv')
-    .addItem('💰 Lançamento manual no caixa', 'abrirLancamentoManual')
-    .addItem('🖨️ Reimprimir recibo…', 'reimprimirRecibo')
-    .addSeparator()
-    .addItem('👤 Gerenciar usuários', 'abrirUsuarios')
+    .addItem('🚀 Abrir sistema', 'abrirSistema')
     .addSeparator()
     .addItem('⚙️ Configurar planilha (criar abas)', 'configurarPlanilha')
     .addItem('📦 Inserir produtos de demonstração', 'inserirProdutosDemo')
     .addToUi();
 }
 
-/** Abre a tela de PDV (requisito 4) em uma janela modal. */
-function abrirPdv() {
-  const html = HtmlService.createHtmlOutputFromFile('PDV')
-    .setWidth(1050)
-    .setHeight(720);
-  SpreadsheetApp.getUi().showModalDialog(html, '🛒 PDV — Frente de Caixa');
-}
-
-/** Abre o formulário de lançamento manual no caixa (regra 3.2 — Conciliação). */
-function abrirLancamentoManual() {
-  const html = HtmlService.createHtmlOutputFromFile('Lancamento')
-    .setWidth(420)
-    .setHeight(560);
-  SpreadsheetApp.getUi().showModalDialog(html, '💰 Lançamento manual no caixa');
-}
-
 /**
- * Abre a gestão de usuários (exclusiva do perfil Administrador).
- * O arquivo HTML chama-se "TelaUsuarios" porque o Apps Script não permite
- * dois arquivos com o mesmo nome no projeto — e "Usuarios" já é o nome
- * do arquivo de script Usuarios.gs.
+ * Abre o sistema completo (App.html) em uma janela dentro da planilha.
+ * O mesmo aplicativo também pode ser publicado como App da Web (ver doGet).
  */
-function abrirUsuarios() {
-  const html = HtmlService.createHtmlOutputFromFile('TelaUsuarios')
-    .setWidth(760)
-    .setHeight(640);
-  SpreadsheetApp.getUi().showModalDialog(html, '👤 Usuários do sistema');
-}
-
-/** Pergunta o número da venda e exibe o recibo para impressão (requisito 4). */
-function reimprimirRecibo() {
-  const ui = SpreadsheetApp.getUi();
-  const resposta = ui.prompt('Reimprimir recibo',
-                             'Informe o número da venda (ID_Venda):',
-                             ui.ButtonSet.OK_CANCEL);
-  if (resposta.getSelectedButton() !== ui.Button.OK) return;
-
-  const idVenda = parseInt(resposta.getResponseText(), 10);
-  if (!idVenda) {
-    ui.alert('Número de venda inválido.');
-    return;
-  }
-  const recibo = gerarReciboHtml_(idVenda); // definida em Vendas.gs
-  const html = HtmlService.createHtmlOutput(
-      recibo +
-      '<div style="text-align:center;margin-top:12px">' +
-      '<button onclick="window.print()" style="padding:8px 24px">🖨️ Imprimir</button>' +
-      '</div>')
-    .setWidth(760)
-    .setHeight(680);
-  ui.showModalDialog(html, 'Recibo da venda Nº ' + idVenda);
+function abrirSistema() {
+  const html = HtmlService.createHtmlOutputFromFile('App')
+    .setWidth(1280)
+    .setHeight(780);
+  SpreadsheetApp.getUi().showModalDialog(html, '🏬 MEGA OUTLET — Sistema de Gestão');
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +189,7 @@ function configurarPlanilha() {
   const abaProdutos = planilha.getSheetByName(ABAS.PRODUTOS);
   const abaVendas = planilha.getSheetByName(ABAS.VENDAS);
   const abaCaixa = planilha.getSheetByName(ABAS.CAIXA);
+  const abaOrcamentos = planilha.getSheetByName(ABAS.ORCAMENTOS);
   const abaUsuarios = planilha.getSheetByName(ABAS.USUARIOS);
 
   // ----- Validações de dados (listas suspensas dos enums) -----------------
@@ -214,11 +199,13 @@ function configurarPlanilha() {
   aplicarListaSuspensa_(abaCaixa.getRange('C2:C'), TIPOS_LANCAMENTO, false);
   aplicarListaSuspensa_(abaCaixa.getRange('D2:D'), CATEGORIAS_CAIXA, true);
   aplicarListaSuspensa_(abaCaixa.getRange('F2:F'), FORMAS_PAGAMENTO, false);
+  aplicarListaSuspensa_(abaOrcamentos.getRange('G2:G'), FORMAS_ENTREGA, false);
+  aplicarListaSuspensa_(abaOrcamentos.getRange('K2:K'), STATUS_ORCAMENTO, false);
   aplicarListaSuspensa_(abaUsuarios.getRange('D2:D'), PERFIS_USUARIO, false);
   aplicarListaSuspensa_(abaUsuarios.getRange('E2:E'), ['Sim', 'Não'], false);
 
   // A aba de usuários guarda hashes de senha — fica oculta; toda a gestão
-  // é feita pelo menu 👤 Gerenciar usuários (Ver → abas ocultas, se precisar)
+  // é feita pela tela 👤 Usuários do sistema (Ver → abas ocultas, se precisar)
   try { abaUsuarios.hideSheet(); } catch (e) { /* única aba visível: ignora */ }
 
   // ----- Formatos de número (moeda e datas) -------------------------------
@@ -227,6 +214,8 @@ function configurarPlanilha() {
   abaVendas.getRange('H2:H').setNumberFormat('"R$" #,##0.00');
   abaCaixa.getRange('B2:B').setNumberFormat('dd/mm/yyyy hh:mm:ss');
   abaCaixa.getRange('E2:E').setNumberFormat('"R$" #,##0.00');
+  abaOrcamentos.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
+  abaOrcamentos.getRange('I2:I').setNumberFormat('"R$" #,##0.00');
 
   // ----- Dashboard (requisito 4) ------------------------------------------
   const dash = obterOuCriarAba_(planilha, ABAS.DASHBOARD);

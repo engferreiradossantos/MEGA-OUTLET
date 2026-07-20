@@ -1,7 +1,10 @@
 # 🏬 MEGA OUTLET — Versão Google Sheets (Apps Script)
 
-Sistema de **estoque, vendas (PDV) e fluxo de caixa** rodando 100% dentro de
-uma planilha do Google Sheets, com interface em HTML/CSS.
+Sistema de gestão completo, estilo ERP, rodando sobre uma planilha do Google
+Sheets: **layout moderno com menu lateral** e telas de Dashboard, Vendas
+(PDV), Orçamentos, Clientes, Estoque, Fluxo de Caixa, Relatórios e Usuários —
+com **login/senha por perfil** e **PDF** do pedido/recibo, do orçamento e do
+relatório gerencial.
 
 ## 📋 Instalação (passo a passo)
 
@@ -17,122 +20,95 @@ uma planilha do Google Sheets, com interface em HTML/CSS.
    | `Vendas.gs` | Script | `Vendas.gs` |
    | `Caixa.gs` | Script | `Caixa.gs` |
    | `Usuarios.gs` | Script | `Usuarios.gs` |
-   | `PDV` | HTML | `PDV.html` |
-   | `Lancamento` | HTML | `Lancamento.html` |
-   | `TelaUsuarios` | HTML | `TelaUsuarios.html` |
+   | `Clientes.gs` | Script | `Clientes.gs` |
+   | `Orcamentos.gs` | Script | `Orcamentos.gs` |
+   | `Relatorios.gs` | Script | `Relatorios.gs` |
+   | `App` | HTML | `App.html` |
 
-   > ⚠️ Os arquivos HTML devem se chamar exatamente **PDV**, **Lancamento** e
-   > **TelaUsuarios** (o editor acrescenta o `.html` sozinho).
-   >
-   > ⚠️ **Importante:** o arquivo HTML de usuários chama-se **TelaUsuarios**
-   > (e não "Usuarios"). O Apps Script **não permite dois arquivos com o
-   > mesmo nome** no projeto, mesmo sendo de tipos diferentes — como já existe
-   > o script `Usuarios.gs`, um HTML chamado "Usuarios" causaria conflito e a
-   > tela não abriria.
+   > ⚠️ O arquivo HTML deve se chamar exatamente **App** (o editor acrescenta
+   > o `.html` sozinho). Lembre-se: o Apps Script **não permite dois arquivos
+   > com o mesmo nome**, mesmo de tipos diferentes.
 
 4. Salve tudo (💾 ou `Ctrl+S`) e **recarregue a aba da planilha** no navegador.
-5. Vai aparecer o menu **🏬 MEGA OUTLET**. Clique em
-   **⚙️ Configurar planilha** — na primeira execução o Google pedirá
-   autorização (é o fluxo normal de scripts: *Permitir* → escolher sua conta).
-6. Abra **🛒 Abrir PDV**: como ainda não há usuários, aparece a tela de
-   **primeiro acesso** para criar a conta do **Administrador** (nome, login
-   e senha). Depois disso, todo cadastro de usuário é feito pelo menu
-   **👤 Gerenciar usuários**.
+5. No menu **🏬 MEGA OUTLET**, clique em **⚙️ Configurar planilha** — na
+   primeira execução o Google pedirá autorização (fluxo normal:
+   *Permitir* → escolher sua conta).
+6. Clique em **🚀 Abrir sistema**: como ainda não há usuários, aparece a tela
+   de **primeiro acesso** para criar a conta do **Administrador**.
 7. (Opcional) **📦 Inserir produtos de demonstração** para testar.
-8. Faça login no PDV e registre a primeira venda. 🎉
+8. Faça login e use o sistema pelo menu lateral. 🎉
 
 > 💡 Quem usa [clasp](https://github.com/google/clasp) pode simplesmente fazer
 > `clasp push` a partir desta pasta (o `appsscript.json` já está incluído).
 
-## 🌐 Usar fora da planilha (App da Web — opcional)
+## 🖥️ Telas (menu lateral)
 
-O sistema funciona normalmente **dentro da planilha**, pelo menu
-🏬 MEGA OUTLET — não é preciso implantar nada. Mas, se você quiser abrir as
-telas por uma **URL própria** (ex.: no celular do vendedor, sem abrir a
-planilha), publique como App da Web:
+| Tela | Quem acessa | O que faz |
+|---|---|---|
+| 📊 Dashboard | Todos | Faturamento do dia/mês, saldo do caixa (só admin), alerta de reposição, últimas vendas |
+| 🛒 Vendas (PDV) | Todos | Busca de produto, carrinho, cliente (cadastrado ou avulso), finalizar venda, recibo/pedido com impressão e **PDF** |
+| 📄 Orçamentos | Todos | Monta orçamento (sem baixar estoque), imprime/baixa **PDF**, converte em venda ou cancela |
+| 🤝 Clientes | Todos | Cadastro e edição de clientes (nome, CPF, telefone, e-mail, endereço) |
+| 📦 Estoque | Todos (gestão só admin) | Consulta; cadastro de produto e entrada de mercadoria são do Administrador |
+| 💰 Fluxo de Caixa | Administrador | Lançamentos manuais e extrato com filtro por período |
+| 📈 Relatórios | Administrador | Vendas (por pagamento, vendedor, top produtos), caixa por categoria, posição de estoque — com **PDF** |
+| 👤 Usuários | Administrador | Cadastro, redefinição de senha e ativação/desativação |
+
+## 🗂️ Abas criadas na planilha
+
+| Aba | Conteúdo |
+|---|---|
+| `Produtos` | ID, SKU, Descrição, Categoria, Quantidade_Atual, Quantidade_Minima, Preços, Status_Garantia |
+| `Vendas` + `Itens_Venda` | Pedidos confirmados (com vendedor) e seus itens |
+| `Orcamentos` + `Itens_Orcamento` | Orçamentos com status (Aberto/Convertido/Cancelado) e vínculo com a venda gerada |
+| `Clientes` | Cadastro de clientes |
+| `Fluxo_Caixa` | Entradas/Saídas com forma de pagamento, venda vinculada e usuário |
+| `Usuarios` | Login, perfil e hash de senha (aba oculta; gestão pela tela 👤) |
+| `Dashboard` | Indicadores por fórmulas, para consulta rápida dentro da própria planilha |
+
+## ⚙️ Regras de negócio
+
+A função central continua sendo **`registrarVenda`** (`Vendas.gs`), sob
+bloqueio exclusivo (`LockService`): valida saldo de estoque (com opção
+**Sob Encomenda**), grava venda + itens, dá **baixa automática** no estoque,
+lança a **Entrada** no `Fluxo_Caixa` herdando valor e forma de pagamento, e
+anexa o **aviso legal** de peças outlet/mostruário. **Orçamentos não baixam
+estoque nem mexem no caixa** — só quando convertidos em venda (aí passam
+pela `registrarVenda` normal).
+
+Os PDFs (pedido/recibo, orçamento e relatório) são gerados no servidor pelo
+conversor nativo do Apps Script (HTML → PDF) e baixados direto pelo navegador.
+
+## 👤 Login, perfis e segurança
+
+- Senhas guardadas apenas como **hash com salt** (SHA-256 iterado); login
+  gera token de sessão (CacheService, até 6 h) validado em toda chamada;
+- **Administrador**: tudo. **Vendedor**: PDV, orçamentos, clientes, recibos e
+  consulta de estoque;
+- Cada venda, orçamento e lançamento registra **quem** o fez; o documento
+  impresso mostra "Atendido por"/"Vendedor";
+- O "primeiro acesso" trava após existir o primeiro usuário; o último
+  administrador ativo não pode ser desativado.
+
+> 🔒 **Limite do Google Sheets**: quem tem acesso de *edição* à planilha vê
+> as abas diretamente. O login controla o uso do **sistema**; para proteger
+> os **dados**, compartilhe a planilha apenas com o dono/administrador e dê
+> aos vendedores somente a URL do App da Web.
+
+## 🌐 Usar fora da planilha (App da Web — recomendado para vendedores)
 
 1. No editor do Apps Script: **Implantar → Nova implantação → App da Web**;
 2. **Executar como:** Eu (sua conta) | **Quem pode acessar:** restrinja às
    pessoas da loja;
-3. Abra a URL gerada (termina em `/exec`):
+3. Compartilhe a URL gerada (termina em `/exec`) — ela abre o sistema
+   completo, com login, sem precisar abrir a planilha.
 
-   | URL | Tela |
-   |---|---|
-   | `.../exec` | 🛒 PDV (padrão) |
-   | `.../exec?pagina=caixa` | 💰 Lançamento manual (só Administrador) |
-   | `.../exec?pagina=usuarios` | 👤 Gestão de usuários (só Administrador) |
-
-O erro **"Função de script não encontrada: doGet"** aparecia ao acessar a
-URL de uma implantação antiga (antes do `doGet` existir) — se ainda o vir,
-atualize o `Codigo.gs` e crie uma **nova implantação** (ou edite a existente
-para a nova versão). O login/senha do sistema continua sendo exigido em
-todas as operações também no modo App da Web.
-
-## 🗂️ Abas criadas (estrutura de dados do requisito 2)
-
-| Aba | Requisito | Colunas |
-|---|---|---|
-| `Produtos` | 2.1 | ID_Produto, SKU, Descricao, Categoria, Quantidade_Atual, Quantidade_Minima, Preco_Custo, Preco_Venda, Status_Garantia |
-| `Vendas` | 2.3 | ID_Venda, Data_Venda, Cliente_Nome, Cliente_CPF, Cliente_Telefone, Forma_Entrega, Endereco_Entrega, Valor_Total, Observacoes, ID_Usuario |
-| `Itens_Venda` | 2.4 | ID_Item, ID_Venda, ID_Produto, Quantidade, Preco_Unitario_Aplicado |
-| `Fluxo_Caixa` | 2.2 | ID_Lancamento, Data_Hora, Tipo, Categoria, Valor, Forma_Pagamento, ID_Venda, ID_Usuario |
-| `Usuarios` | — | ID_Usuario, Login, Nome, Perfil, Ativo, Salt, Senha_Hash (aba oculta; gestão pelo menu) |
-| `Dashboard` | 4 | Faturamento do dia/mês, saldo do caixa e alerta de reposição (fórmulas automáticas) |
-
-As colunas de enum (Categoria, Tipo, Forma_Pagamento etc.) recebem **listas
-suspensas** de validação, e as colunas de dinheiro/data recebem formato
-automático.
-
-## 👤 Usuários, login e perfis
-
-O uso do sistema exige **login e senha**. As senhas são gravadas apenas como
-**hash com salt** (SHA-256 iterado — nunca em texto puro), e o login gera um
-token de sessão válido por até 6 horas. Cada venda e cada lançamento no caixa
-registram **qual usuário** os executou (coluna `ID_Usuario`), e o recibo
-mostra "Atendido por".
-
-| Perfil | Pode |
-|---|---|
-| **Administrador** | Tudo: PDV, lançamentos manuais no caixa e gestão de usuários |
-| **Vendedor** | PDV (vendas) e recibos |
-
-Regras de proteção: o "primeiro acesso" só funciona enquanto não existe
-nenhum usuário; um vendedor não consegue criar usuários nem lançar despesas;
-e o último administrador ativo não pode ser desativado.
-
-> 🔒 **Limite importante do Google Sheets**: quem tem acesso de *edição* à
-> planilha consegue ver e alterar as abas diretamente. O login controla o
-> uso do **sistema** (PDV, caixa, usuários); para proteger os **dados**,
-> compartilhe a planilha apenas com o dono/administrador.
-
-## ⚙️ Funcionamento (regras de negócio do requisito 3)
-
-A função central é **`registrarVenda`** (`Vendas.gs`), chamada pelo botão
-**"Finalizar Venda"** do PDV. Sob bloqueio exclusivo (`LockService`, que
-impede dois caixas de gravarem ao mesmo tempo), ela:
-
-1. **Valida o saldo de estoque** de todos os itens — bloqueia a venda acima
-   do disponível, a menos que a opção **Sob Encomenda** esteja marcada
-   (aí o saldo pode ficar negativo, representando itens a encomendar);
-2. Grava a venda em `Vendas` e os itens em `Itens_Venda`;
-3. Dá a **baixa automática** na coluna `Quantidade_Atual` de `Produtos`;
-4. Lança a **Entrada** em `Fluxo_Caixa` herdando o valor total e a forma de
-   pagamento, vinculada pela coluna `ID_Venda`;
-5. Devolve o **recibo em HTML** com dados da loja, cliente, itens, termo de
-   garantia e assinaturas — com botão de impressão (Ctrl+P → salvar em PDF).
-
-Como o Sheets não tem transações de banco de dados, **todas as validações
-acontecem antes de qualquer escrita** — na prática, ou a venda inteira entra,
-ou nada entra.
-
-Vendas com produto de **outlet/mostruário** (garantia "Sem garantia / No
-estado") recebem automaticamente o aviso legal nas observações:
-*"Peças vendidas no estado em que se encontram, sem troca e sem garantia."*
-
-Despesas (fornecedor, custos fixos, pró-labore) são lançadas pelo menu
-**💰 Lançamento manual no caixa**.
+> Se aparecer **"Função de script não encontrada: doGet"**, a implantação
+> aponta para uma versão antiga do código — edite a implantação e selecione
+> a nova versão (ou crie uma nova implantação).
 
 ## 🏪 Personalização
 
-Edite a constante `DADOS_LOJA` no topo de `Codigo.gs` com o nome, CNPJ,
-endereço e telefone reais da loja — eles aparecem no cabeçalho do recibo.
+Edite a constante `DADOS_LOJA` no topo de `Codigo.gs` com nome, CNPJ,
+endereço e telefone reais — eles saem no cabeçalho do recibo, do orçamento e
+do relatório.
