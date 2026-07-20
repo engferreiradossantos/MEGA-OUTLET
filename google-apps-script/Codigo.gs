@@ -72,6 +72,40 @@ const DADOS_LOJA = {
 };
 
 // ---------------------------------------------------------------------------
+// App da Web (opcional)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ponto de entrada quando o projeto é publicado como App da Web
+ * (Implantar → Nova implantação → App da Web). Serve as telas do sistema
+ * fora da planilha, pela URL da implantação:
+ *
+ *   .../exec                    → PDV (tela padrão)
+ *   .../exec?pagina=caixa       → Lançamento manual no caixa
+ *   .../exec?pagina=usuarios    → Gestão de usuários
+ *
+ * Recomendação ao implantar: "Executar como: Eu" e restrinja "Quem pode
+ * acessar" às pessoas da loja — o login/senha do sistema continua sendo
+ * exigido em todas as operações de qualquer forma.
+ *
+ * Usar como App da Web é OPCIONAL: dentro da planilha tudo funciona pelo
+ * menu 🏬 MEGA OUTLET, sem precisar implantar nada.
+ */
+function doGet(e) {
+  const pagina = String((e && e.parameter && e.parameter.pagina) || 'pdv')
+    .toLowerCase();
+  const telas = {
+    pdv: { arquivo: 'PDV', titulo: '🛒 PDV — MEGA OUTLET' },
+    caixa: { arquivo: 'Lancamento', titulo: '💰 Caixa — MEGA OUTLET' },
+    usuarios: { arquivo: 'TelaUsuarios', titulo: '👤 Usuários — MEGA OUTLET' },
+  };
+  const tela = telas[pagina] || telas.pdv;
+  return HtmlService.createHtmlOutputFromFile(tela.arquivo)
+    .setTitle(tela.titulo)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// ---------------------------------------------------------------------------
 // Menu da planilha
 // ---------------------------------------------------------------------------
 
@@ -132,7 +166,7 @@ function reimprimirRecibo() {
     ui.alert('Número de venda inválido.');
     return;
   }
-  const recibo = gerarReciboHtml(idVenda); // definida em Vendas.gs
+  const recibo = gerarReciboHtml_(idVenda); // definida em Vendas.gs
   const html = HtmlService.createHtmlOutput(
       recibo +
       '<div style="text-align:center;margin-top:12px">' +
@@ -148,10 +182,13 @@ function reimprimirRecibo() {
 // ---------------------------------------------------------------------------
 
 /**
- * Cria as 4 abas de dados + Dashboard, com cabeçalhos, validações de dados
+ * Cria as abas de dados + Dashboard, com cabeçalhos, validações de dados
  * (listas suspensas), formatos de número e fórmulas dos indicadores.
+ * Função de MENU: o getUi() na primeira linha garante que ela só roda de
+ * dentro da planilha (em uma implantação como App da Web, falha de imediato).
  */
 function configurarPlanilha() {
+  const ui = SpreadsheetApp.getUi();
   const planilha = SpreadsheetApp.getActiveSpreadsheet();
 
   // ----- Abas de dados, com cabeçalho em negrito e linha congelada --------
@@ -221,7 +258,7 @@ function configurarPlanilha() {
     ' Produtos!E2:E<=Produtos!F2:F, Produtos!B2:B<>""),' +
     ' "✅ Nenhum produto abaixo do mínimo")');
 
-  SpreadsheetApp.getUi().alert(
+  ui.alert(
     'Planilha configurada! Abas criadas: ' +
     Object.values(ABAS).join(', ') + '.');
 }

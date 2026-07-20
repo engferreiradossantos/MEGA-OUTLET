@@ -168,7 +168,7 @@ function registrarVenda(dados) {
     return {
       idVenda: idVenda,
       valorTotal: valorTotal,
-      reciboHtml: gerarReciboHtml(idVenda),
+      reciboHtml: gerarReciboHtml_(idVenda),
     };
   } finally {
     bloqueio.releaseLock();
@@ -182,8 +182,10 @@ function registrarVenda(dados) {
 /**
  * Monta o recibo em HTML (pronto para impressão) a partir do ID da venda.
  * Usado pelo PDV logo após a venda e pelo menu "Reimprimir recibo".
+ * PRIVADA (sufixo "_"): não pode ser chamada via google.script.run, para
+ * que os dados de venda não fiquem expostos sem login no modo App da Web.
  */
-function gerarReciboHtml(idVenda) {
+function gerarReciboHtml_(idVenda) {
   idVenda = Number(idVenda);
 
   // ----- Cabeçalho da venda ------------------------------------------------

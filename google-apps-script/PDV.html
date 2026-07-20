@@ -295,7 +295,7 @@
         preencherPreco();
       })
       .withFailureHandler(mostrarErro)
-      .buscarProdutos(termo);
+      .buscarProdutos(termo, tokenSessao);
   }
 
   // Preenche o campo de preço com o preço de venda do produto selecionado

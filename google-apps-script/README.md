@@ -44,6 +44,30 @@ uma planilha do Google Sheets, com interface em HTML/CSS.
 > 💡 Quem usa [clasp](https://github.com/google/clasp) pode simplesmente fazer
 > `clasp push` a partir desta pasta (o `appsscript.json` já está incluído).
 
+## 🌐 Usar fora da planilha (App da Web — opcional)
+
+O sistema funciona normalmente **dentro da planilha**, pelo menu
+🏬 MEGA OUTLET — não é preciso implantar nada. Mas, se você quiser abrir as
+telas por uma **URL própria** (ex.: no celular do vendedor, sem abrir a
+planilha), publique como App da Web:
+
+1. No editor do Apps Script: **Implantar → Nova implantação → App da Web**;
+2. **Executar como:** Eu (sua conta) | **Quem pode acessar:** restrinja às
+   pessoas da loja;
+3. Abra a URL gerada (termina em `/exec`):
+
+   | URL | Tela |
+   |---|---|
+   | `.../exec` | 🛒 PDV (padrão) |
+   | `.../exec?pagina=caixa` | 💰 Lançamento manual (só Administrador) |
+   | `.../exec?pagina=usuarios` | 👤 Gestão de usuários (só Administrador) |
+
+O erro **"Função de script não encontrada: doGet"** aparecia ao acessar a
+URL de uma implantação antiga (antes do `doGet` existir) — se ainda o vir,
+atualize o `Codigo.gs` e crie uma **nova implantação** (ou edite a existente
+para a nova versão). O login/senha do sistema continua sendo exigido em
+todas as operações também no modo App da Web.
+
 ## 🗂️ Abas criadas (estrutura de dados do requisito 2)
 
 | Aba | Requisito | Colunas |

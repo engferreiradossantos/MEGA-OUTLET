@@ -16,8 +16,10 @@ const COL_PROD = {
  * Busca do PDV (requisito 4): localiza produtos por SKU ou parte da
  * descrição, sem diferenciar maiúsculas. Chamada pelo PDV.html via
  * google.script.run — devolve no máximo 30 resultados.
+ * Exige sessão válida (o catálogo não fica exposto a quem não logou).
  */
-function buscarProdutos(termo) {
+function buscarProdutos(termo, token) {
+  validarSessao_(token, PERFIS_USUARIO);
   termo = String(termo || '').trim().toLowerCase();
   if (!termo) return [];
 
@@ -77,9 +79,11 @@ function produtoEhOutlet_(statusGarantia) {
 
 /**
  * Insere produtos de demonstração (menu 🏬 MEGA OUTLET).
- * Idempotente: SKUs já cadastrados são ignorados.
+ * Idempotente: SKUs já cadastrados são ignorados. Função de MENU: o
+ * getUi() na primeira linha impede execução via App da Web sem login.
  */
 function inserirProdutosDemo() {
+  const ui = SpreadsheetApp.getUi();
   const demo = [
     // [SKU, Descricao, Categoria, Qtd, QtdMin, Custo, Venda, Garantia]
     ['SOF-001', 'Sofá Retrátil e Reclinável em linho molas ensac 2.14M',
