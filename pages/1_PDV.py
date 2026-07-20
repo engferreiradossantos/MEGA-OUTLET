@@ -9,6 +9,7 @@ transação) → recibo para impressão.
 import streamlit as st
 import streamlit.components.v1 as components
 
+from mega_outlet.autenticacao import exigir_login
 from mega_outlet.constants import FORMAS_ENTREGA, FORMAS_PAGAMENTO
 from mega_outlet.database import bootstrap
 from mega_outlet.erros import ErroDeNegocio
@@ -16,6 +17,7 @@ from mega_outlet.services import produtos, recibo, vendas
 
 st.set_page_config(page_title="PDV — MEGA OUTLET", page_icon="🛒", layout="wide")
 conn = bootstrap()
+usuario = exigir_login(conn)  # Administrador e Vendedor podem vender
 
 st.title("🛒 PDV — Frente de Caixa")
 
@@ -140,6 +142,7 @@ if st.button("✅ Finalizar Venda", type="primary", width="stretch"):
             itens=itens,
             observacoes=observacoes,
             permitir_sob_encomenda=permitir_sob_encomenda,
+            id_usuario=usuario["id_usuario"],  # registra quem vendeu
         )
         st.session_state.carrinho = []
         st.session_state.ultimo_recibo = recibo.gerar_recibo_html(

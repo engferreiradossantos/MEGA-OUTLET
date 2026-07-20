@@ -10,6 +10,7 @@ Executar com:  streamlit run app.py
 import pandas as pd
 import streamlit as st
 
+from mega_outlet.autenticacao import eh_administrador, exigir_login
 from mega_outlet.database import bootstrap
 from mega_outlet.services import caixa, produtos, vendas
 
@@ -18,17 +19,19 @@ st.set_page_config(
 )
 
 conn = bootstrap()
+usuario = exigir_login(conn)  # qualquer perfil; conteúdo varia abaixo
 
 st.title("🏬 MEGA OUTLET — Dashboard")
 st.caption("Gestão de estoque, vendas e fluxo de caixa")
 
 # ---------------------------------------------------------------------------
-# Indicadores principais
+# Indicadores principais (saldo do caixa é restrito ao Administrador)
 # ---------------------------------------------------------------------------
 col1, col2, col3 = st.columns(3)
 col1.metric("Faturamento de hoje", f"R$ {caixa.faturamento_do_dia(conn):,.2f}")
 col2.metric("Faturamento do mês", f"R$ {caixa.faturamento_do_mes(conn):,.2f}")
-col3.metric("Saldo atual do caixa", f"R$ {caixa.saldo_atual(conn):,.2f}")
+if eh_administrador(usuario):
+    col3.metric("Saldo atual do caixa", f"R$ {caixa.saldo_atual(conn):,.2f}")
 
 # ---------------------------------------------------------------------------
 # Alerta de reposição de estoque
@@ -87,8 +90,10 @@ with col_vendas:
 
 with col_caixa:
     st.subheader("💰 Últimos lançamentos no caixa")
-    lancamentos = caixa.extrato(conn, limite=10)
-    if lancamentos:
+    lancamentos = caixa.extrato(conn, limite=10) if eh_administrador(usuario) else []
+    if not eh_administrador(usuario):
+        st.info("Visível apenas para o perfil Administrador.")
+    elif lancamentos:
         st.dataframe(
             pd.DataFrame(
                 [

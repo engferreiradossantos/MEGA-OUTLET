@@ -9,7 +9,7 @@ import unittest
 from mega_outlet.constants import AVISO_LEGAL_OUTLET
 from mega_outlet.database import get_connection, init_db
 from mega_outlet.erros import EstoqueInsuficiente, ProdutoNaoEncontrado
-from mega_outlet.services import caixa, produtos, vendas
+from mega_outlet.services import caixa, produtos, usuarios, vendas
 from mega_outlet.services.vendas import ItemCarrinho
 
 
@@ -178,6 +178,33 @@ class TesteRegistrarVenda(unittest.TestCase):
             itens=[ItemCarrinho(self.id_sofa, quantidade=1, preco_unitario=2500.00)],
         )
         self.assertEqual(confirmacao.valor_total, 2500.00)
+
+    def test_venda_registra_o_usuario_vendedor(self):
+        id_vendedor = usuarios.criar_usuario(
+            self.conn, login="carla", nome="Carla Vendedora",
+            senha="123456", perfil="Vendedor",
+        )
+        confirmacao = vendas.registrar_venda(
+            self.conn,
+            cliente_nome="Cliente Rastreado",
+            forma_pagamento="PIX",
+            itens=[ItemCarrinho(self.id_sofa, quantidade=1)],
+            id_usuario=id_vendedor,
+        )
+        # Venda e lançamento do caixa gravam quem operou
+        venda = self.conn.execute(
+            "SELECT id_usuario FROM vendas WHERE id_venda = ?",
+            (confirmacao.id_venda,),
+        ).fetchone()
+        self.assertEqual(venda["id_usuario"], id_vendedor)
+        lancamento = self.conn.execute(
+            "SELECT id_usuario FROM fluxo_caixa WHERE id_venda = ?",
+            (confirmacao.id_venda,),
+        ).fetchone()
+        self.assertEqual(lancamento["id_usuario"], id_vendedor)
+        # E o recibo identifica o vendedor
+        dados = vendas.obter_venda(self.conn, confirmacao.id_venda)
+        self.assertEqual(dados["venda"]["vendedor_nome"], "Carla Vendedora")
 
     def test_obter_venda_para_recibo(self):
         confirmacao = vendas.registrar_venda(

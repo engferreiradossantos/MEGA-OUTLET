@@ -45,9 +45,62 @@
     #frame-recibo { width: 100%; height: 320px; border: 1px solid #ccc;
                     border-radius: 4px; background: #fff; }
     #resultado-busca:disabled { background: #f5f5f5; }
+    /* Tela de login / primeiro acesso */
+    #tela-login { display: flex; justify-content: center;
+                  align-items: flex-start; padding-top: 40px; }
+    .caixa-login { width: 340px; border: 1px solid #ccc; border-radius: 8px;
+                   padding: 20px; background: #fafbff; }
+    .caixa-login h3 { margin-top: 0; }
+    #tela-pdv { display: none; }
+    .barra-operador { display: flex; justify-content: space-between;
+                      align-items: center; background: #eef3fe;
+                      border-radius: 4px; padding: 6px 10px;
+                      margin-bottom: 10px; font-size: 13px; }
+    .barra-operador button { width: auto; background: #c5221f; color: #fff;
+                             padding: 4px 12px; }
   </style>
 </head>
 <body>
+  <!-- ============== TELA DE LOGIN / PRIMEIRO ACESSO ============== -->
+  <div id="tela-login">
+    <div class="caixa-login">
+      <h3 id="titulo-login">🔐 Carregando…</h3>
+
+      <!-- Primeiro acesso: cria o Administrador inicial -->
+      <div id="form-primeiro-acesso" style="display:none">
+        <p class="aviso">Nenhum usuário cadastrado. Crie a conta do
+           <strong>Administrador</strong> para começar.</p>
+        <label>Nome completo</label><input id="pa-nome">
+        <label>Login</label><input id="pa-login">
+        <label>Senha (mín. 6 caracteres)</label>
+        <input id="pa-senha" type="password">
+        <label>Confirmar senha</label>
+        <input id="pa-confirmacao" type="password">
+        <button class="botao-azul" style="margin-top:12px"
+                onclick="criarAdmin()">Criar administrador</button>
+      </div>
+
+      <!-- Login normal -->
+      <div id="form-login" style="display:none">
+        <label>Login</label>
+        <input id="login-usuario" onkeydown="if(event.key==='Enter')entrar()">
+        <label>Senha</label>
+        <input id="login-senha" type="password"
+               onkeydown="if(event.key==='Enter')entrar()">
+        <button class="botao-azul" style="margin-top:12px"
+                onclick="entrar()">Entrar</button>
+      </div>
+
+      <div id="mensagem-login" class="mensagem"></div>
+    </div>
+  </div>
+
+  <!-- ============== TELA DO PDV (após o login) ============== -->
+  <div id="tela-pdv">
+  <div class="barra-operador">
+    <span id="info-operador">👤</span>
+    <button onclick="sair()">🚪 Sair</button>
+  </div>
   <div class="grade">
     <!-- Coluna 1: busca de produto (por código ou nome) -->
     <section>
@@ -128,12 +181,70 @@
       🖨️ Imprimir recibo
     </button>
   </section>
+  </div> <!-- fim de #tela-pdv -->
 
 <script>
   // Estado da tela
   var carrinho = [];          // itens adicionados: {idProduto, sku, descricao, quantidade, precoUnitario}
   var resultadosBusca = [];   // últimos produtos devolvidos pela busca
   var htmlRecibo = '';        // recibo da última venda concluída
+  var tokenSessao = null;     // token devolvido por loginUsuario (obrigatório)
+
+  // ---------------- Login / primeiro acesso ----------------
+  // Decide qual formulário mostrar: primeiro acesso (sem usuários) ou login
+  google.script.run.withSuccessHandler(function (existe) {
+    document.getElementById('titulo-login').textContent =
+      existe ? '🔐 Login' : '🏬 Primeiro acesso';
+    document.getElementById(existe ? 'form-login' : 'form-primeiro-acesso')
+      .style.display = 'block';
+  }).withFailureHandler(mostrarErroLogin).existeAlgumUsuario();
+
+  function criarAdmin() {
+    var senha = document.getElementById('pa-senha').value;
+    if (senha !== document.getElementById('pa-confirmacao').value) {
+      mostrarErroLogin({ message: 'As senhas não conferem.' });
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(aoLogar)
+      .withFailureHandler(mostrarErroLogin)
+      .criarAdministradorInicial({
+        nome: document.getElementById('pa-nome').value,
+        login: document.getElementById('pa-login').value,
+        senha: senha,
+      });
+  }
+
+  function entrar() {
+    google.script.run
+      .withSuccessHandler(aoLogar)
+      .withFailureHandler(mostrarErroLogin)
+      .loginUsuario(document.getElementById('login-usuario').value,
+                    document.getElementById('login-senha').value);
+  }
+
+  // Sessão criada: guarda o token e troca para a tela do PDV
+  function aoLogar(sessao) {
+    tokenSessao = sessao.token;
+    document.getElementById('info-operador').textContent =
+      '👤 ' + sessao.nome + ' — perfil ' + sessao.perfil;
+    document.getElementById('tela-login').style.display = 'none';
+    document.getElementById('tela-pdv').style.display = 'block';
+  }
+
+  function sair() {
+    google.script.run.encerrarSessao(tokenSessao);
+    tokenSessao = null;
+    document.getElementById('tela-pdv').style.display = 'none';
+    document.getElementById('tela-login').style.display = 'flex';
+    document.getElementById('login-senha').value = '';
+  }
+
+  function mostrarErroLogin(erro) {
+    var div = document.getElementById('mensagem-login');
+    div.className = 'mensagem erro';
+    div.textContent = '⚠️ ' + (erro.message || erro);
+  }
 
   // Carrega as listas de opções (formas de pagamento/entrega) do servidor
   google.script.run.withSuccessHandler(function (opcoes) {
@@ -294,6 +405,7 @@
         mostrarErro(erro);
       })
       .registrarVenda({
+        token: tokenSessao, // sessão do operador logado
         clienteNome: document.getElementById('cliente-nome').value,
         clienteCpf: document.getElementById('cliente-cpf').value,
         clienteTelefone: document.getElementById('cliente-telefone').value,

@@ -5,11 +5,13 @@ Tela de Recibos — reimpressão do recibo de qualquer venda (requisito 4).
 import streamlit as st
 import streamlit.components.v1 as components
 
+from mega_outlet.autenticacao import exigir_login
 from mega_outlet.database import bootstrap
 from mega_outlet.services import recibo, vendas
 
 st.set_page_config(page_title="Recibos — MEGA OUTLET", page_icon="🖨️", layout="wide")
 conn = bootstrap()
+usuario = exigir_login(conn)  # Administrador e Vendedor
 
 st.title("🖨️ Recibos")
 

@@ -8,6 +8,7 @@ registra despesas (Saídas) e outras entradas avulsas, e consulta o extrato.
 import pandas as pd
 import streamlit as st
 
+from mega_outlet.autenticacao import exigir_login
 from mega_outlet.constants import (
     CATEGORIAS_CAIXA,
     FORMAS_PAGAMENTO,
@@ -19,6 +20,7 @@ from mega_outlet.services import caixa
 
 st.set_page_config(page_title="Caixa — MEGA OUTLET", page_icon="💰", layout="wide")
 conn = bootstrap()
+usuario = exigir_login(conn, perfis=("Administrador",))  # tela restrita
 
 st.title("💰 Fluxo de Caixa")
 st.metric("Saldo atual", f"R$ {caixa.saldo_atual(conn):,.2f}")
@@ -42,6 +44,7 @@ with st.form("form_lancamento", clear_on_submit=True):
                 categoria=categoria,
                 valor=valor,
                 forma_pagamento=forma_pagamento,
+                id_usuario=usuario["id_usuario"],  # registra quem lançou
             )
             st.success(f"Lançamento {id_lancamento} registrado.")
         except ErroDeNegocio as erro:

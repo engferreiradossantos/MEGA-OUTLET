@@ -79,6 +79,7 @@ def registrar_venda(
     cliente_telefone: str = "",
     observacoes: str = "",
     permitir_sob_encomenda: bool = False,
+    id_usuario: int | None = None,
     data_venda: str | None = None,
 ) -> VendaConfirmada:
     """
@@ -170,8 +171,9 @@ def registrar_venda(
             """
             INSERT INTO vendas (data_venda, cliente_nome, cliente_cpf,
                                 cliente_telefone, forma_entrega,
-                                endereco_entrega, valor_total, observacoes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                endereco_entrega, valor_total, observacoes,
+                                id_usuario)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data_venda,
@@ -182,6 +184,7 @@ def registrar_venda(
                 endereco_entrega,
                 valor_total,
                 observacoes,
+                id_usuario,
             ),
         )
         id_venda = cur.lastrowid
@@ -233,6 +236,7 @@ def registrar_venda(
             valor=valor_total,
             forma_pagamento=forma_pagamento,
             id_venda=id_venda,
+            id_usuario=id_usuario,
             data_hora=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
 
@@ -250,7 +254,13 @@ def obter_venda(conn: sqlite3.Connection, id_venda: int) -> dict:
     dicionário pronto para o gerador de recibo.
     """
     venda = conn.execute(
-        "SELECT * FROM vendas WHERE id_venda = ?", (id_venda,)
+        """
+        SELECT v.*, u.nome AS vendedor_nome
+        FROM vendas v
+        LEFT JOIN usuarios u ON u.id_usuario = v.id_usuario
+        WHERE v.id_venda = ?
+        """,
+        (id_venda,),
     ).fetchone()
     if venda is None:
         raise DadosInvalidos(f"Venda {id_venda} não encontrada.")

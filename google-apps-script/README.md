@@ -16,18 +16,24 @@ uma planilha do Google Sheets, com interface em HTML/CSS.
    | `Produtos.gs` | Script | `Produtos.gs` |
    | `Vendas.gs` | Script | `Vendas.gs` |
    | `Caixa.gs` | Script | `Caixa.gs` |
+   | `Usuarios.gs` | Script | `Usuarios.gs` |
    | `PDV` | HTML | `PDV.html` |
    | `Lancamento` | HTML | `Lancamento.html` |
+   | `Usuarios` | HTML | `Usuarios.html` |
 
-   > ⚠️ Os arquivos HTML devem se chamar exatamente **PDV** e **Lancamento**
-   > (o editor acrescenta o `.html` sozinho).
+   > ⚠️ Os arquivos HTML devem se chamar exatamente **PDV**, **Lancamento** e
+   > **Usuarios** (o editor acrescenta o `.html` sozinho).
 
 4. Salve tudo (💾 ou `Ctrl+S`) e **recarregue a aba da planilha** no navegador.
 5. Vai aparecer o menu **🏬 MEGA OUTLET**. Clique em
    **⚙️ Configurar planilha** — na primeira execução o Google pedirá
    autorização (é o fluxo normal de scripts: *Permitir* → escolher sua conta).
-6. (Opcional) **📦 Inserir produtos de demonstração** para testar.
-7. Abra **🛒 Abrir PDV** e registre a primeira venda. 🎉
+6. Abra **🛒 Abrir PDV**: como ainda não há usuários, aparece a tela de
+   **primeiro acesso** para criar a conta do **Administrador** (nome, login
+   e senha). Depois disso, todo cadastro de usuário é feito pelo menu
+   **👤 Gerenciar usuários**.
+7. (Opcional) **📦 Inserir produtos de demonstração** para testar.
+8. Faça login no PDV e registre a primeira venda. 🎉
 
 > 💡 Quem usa [clasp](https://github.com/google/clasp) pode simplesmente fazer
 > `clasp push` a partir desta pasta (o `appsscript.json` já está incluído).
@@ -37,14 +43,37 @@ uma planilha do Google Sheets, com interface em HTML/CSS.
 | Aba | Requisito | Colunas |
 |---|---|---|
 | `Produtos` | 2.1 | ID_Produto, SKU, Descricao, Categoria, Quantidade_Atual, Quantidade_Minima, Preco_Custo, Preco_Venda, Status_Garantia |
-| `Vendas` | 2.3 | ID_Venda, Data_Venda, Cliente_Nome, Cliente_CPF, Cliente_Telefone, Forma_Entrega, Endereco_Entrega, Valor_Total, Observacoes |
+| `Vendas` | 2.3 | ID_Venda, Data_Venda, Cliente_Nome, Cliente_CPF, Cliente_Telefone, Forma_Entrega, Endereco_Entrega, Valor_Total, Observacoes, ID_Usuario |
 | `Itens_Venda` | 2.4 | ID_Item, ID_Venda, ID_Produto, Quantidade, Preco_Unitario_Aplicado |
-| `Fluxo_Caixa` | 2.2 | ID_Lancamento, Data_Hora, Tipo, Categoria, Valor, Forma_Pagamento, ID_Venda |
+| `Fluxo_Caixa` | 2.2 | ID_Lancamento, Data_Hora, Tipo, Categoria, Valor, Forma_Pagamento, ID_Venda, ID_Usuario |
+| `Usuarios` | — | ID_Usuario, Login, Nome, Perfil, Ativo, Salt, Senha_Hash (aba oculta; gestão pelo menu) |
 | `Dashboard` | 4 | Faturamento do dia/mês, saldo do caixa e alerta de reposição (fórmulas automáticas) |
 
 As colunas de enum (Categoria, Tipo, Forma_Pagamento etc.) recebem **listas
 suspensas** de validação, e as colunas de dinheiro/data recebem formato
 automático.
+
+## 👤 Usuários, login e perfis
+
+O uso do sistema exige **login e senha**. As senhas são gravadas apenas como
+**hash com salt** (SHA-256 iterado — nunca em texto puro), e o login gera um
+token de sessão válido por até 6 horas. Cada venda e cada lançamento no caixa
+registram **qual usuário** os executou (coluna `ID_Usuario`), e o recibo
+mostra "Atendido por".
+
+| Perfil | Pode |
+|---|---|
+| **Administrador** | Tudo: PDV, lançamentos manuais no caixa e gestão de usuários |
+| **Vendedor** | PDV (vendas) e recibos |
+
+Regras de proteção: o "primeiro acesso" só funciona enquanto não existe
+nenhum usuário; um vendedor não consegue criar usuários nem lançar despesas;
+e o último administrador ativo não pode ser desativado.
+
+> 🔒 **Limite importante do Google Sheets**: quem tem acesso de *edição* à
+> planilha consegue ver e alterar as abas diretamente. O login controla o
+> uso do **sistema** (PDV, caixa, usuários); para proteger os **dados**,
+> compartilhe a planilha apenas com o dono/administrador.
 
 ## ⚙️ Funcionamento (regras de negócio do requisito 3)
 

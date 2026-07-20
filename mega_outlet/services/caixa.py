@@ -26,6 +26,7 @@ def inserir_lancamento(
     valor: float,
     forma_pagamento: str,
     id_venda: int | None = None,
+    id_usuario: int | None = None,
     data_hora: str | None = None,
 ) -> int:
     """
@@ -49,10 +50,11 @@ def inserir_lancamento(
     cur = conn.execute(
         """
         INSERT INTO fluxo_caixa (data_hora, tipo, categoria, valor,
-                                 forma_pagamento, id_venda)
-        VALUES (?, ?, ?, ?, ?, ?)
+                                 forma_pagamento, id_venda, id_usuario)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (data_hora, tipo, categoria, valor, forma_pagamento, id_venda),
+        (data_hora, tipo, categoria, valor, forma_pagamento, id_venda,
+         id_usuario),
     )
     return cur.lastrowid
 

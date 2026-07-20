@@ -41,6 +41,13 @@ AVISO_LEGAL_OUTLET = (
 )
 
 # ---------------------------------------------------------------------------
+# Usuários e perfis de acesso
+# ---------------------------------------------------------------------------
+# Administrador: acesso total (usuários, estoque, caixa, dashboard completo)
+# Vendedor: PDV, recibos e consulta de estoque
+PERFIS_USUARIO = ("Administrador", "Vendedor")
+
+# ---------------------------------------------------------------------------
 # Dados da loja (usados no cabeçalho do recibo — requisito 4)
 # ---------------------------------------------------------------------------
 DADOS_LOJA = {

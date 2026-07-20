@@ -1,10 +1,14 @@
 """
 Tela de Estoque — cadastro de produtos, listagem e reposição (requisito 2.1).
+
+Perfis: a listagem é visível a todos; cadastro e reposição são
+exclusivos do Administrador.
 """
 
 import pandas as pd
 import streamlit as st
 
+from mega_outlet.autenticacao import eh_administrador, exigir_login
 from mega_outlet.constants import CATEGORIAS_PRODUTO, STATUS_GARANTIA
 from mega_outlet.database import bootstrap
 from mega_outlet.erros import ErroDeNegocio
@@ -12,15 +16,21 @@ from mega_outlet.services import produtos
 
 st.set_page_config(page_title="Estoque — MEGA OUTLET", page_icon="📦", layout="wide")
 conn = bootstrap()
+usuario = exigir_login(conn)
 
 st.title("📦 Estoque")
 
-aba_lista, aba_cadastro, aba_reposicao = st.tabs(
-    ["Produtos cadastrados", "Cadastrar produto", "Repor estoque"]
-)
+# Vendedor vê apenas a listagem; Administrador tem as 3 abas
+if eh_administrador(usuario):
+    aba_lista, aba_cadastro, aba_reposicao = st.tabs(
+        ["Produtos cadastrados", "Cadastrar produto", "Repor estoque"]
+    )
+else:
+    aba_lista = st.container()
+    st.caption("🔒 Cadastro e reposição são exclusivos do perfil Administrador.")
 
 # ---------------------------------------------------------------------------
-# Listagem
+# Listagem (todos os perfis)
 # ---------------------------------------------------------------------------
 with aba_lista:
     todos = produtos.listar_produtos(conn)
@@ -53,62 +63,60 @@ with aba_lista:
         )
 
 # ---------------------------------------------------------------------------
-# Cadastro
+# Cadastro e reposição (somente Administrador)
 # ---------------------------------------------------------------------------
-with aba_cadastro:
-    with st.form("form_cadastro", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        sku = c1.text_input("SKU / Código *")
-        descricao = c2.text_input("Descrição *")
+if eh_administrador(usuario):
+    with aba_cadastro:
+        with st.form("form_cadastro", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            sku = c1.text_input("SKU / Código *")
+            descricao = c2.text_input("Descrição *")
 
-        c3, c4, c5 = st.columns(3)
-        categoria = c3.selectbox("Categoria", CATEGORIAS_PRODUTO)
-        status_garantia = c4.selectbox("Status de garantia", STATUS_GARANTIA, index=1)
-        quantidade_minima = c5.number_input("Quantidade mínima (alerta)", 0, step=1)
+            c3, c4, c5 = st.columns(3)
+            categoria = c3.selectbox("Categoria", CATEGORIAS_PRODUTO)
+            status_garantia = c4.selectbox("Status de garantia", STATUS_GARANTIA, index=1)
+            quantidade_minima = c5.number_input("Quantidade mínima (alerta)", 0, step=1)
 
-        c6, c7, c8 = st.columns(3)
-        quantidade_atual = c6.number_input("Quantidade inicial", 0, step=1)
-        preco_custo = c7.number_input("Preço de custo (R$)", 0.0, step=10.0, format="%.2f")
-        preco_venda = c8.number_input("Preço de venda (R$)", 0.0, step=10.0, format="%.2f")
+            c6, c7, c8 = st.columns(3)
+            quantidade_atual = c6.number_input("Quantidade inicial", 0, step=1)
+            preco_custo = c7.number_input("Preço de custo (R$)", 0.0, step=10.0, format="%.2f")
+            preco_venda = c8.number_input("Preço de venda (R$)", 0.0, step=10.0, format="%.2f")
 
-        if st.form_submit_button("💾 Cadastrar", width="stretch"):
-            try:
-                novo_id = produtos.cadastrar_produto(
-                    conn,
-                    sku=sku,
-                    descricao=descricao,
-                    categoria=categoria,
-                    quantidade_atual=int(quantidade_atual),
-                    quantidade_minima=int(quantidade_minima),
-                    preco_custo=preco_custo,
-                    preco_venda=preco_venda,
-                    status_garantia=status_garantia,
-                )
-                st.success(f"Produto cadastrado com ID {novo_id}.")
-            except ErroDeNegocio as erro:
-                st.error(str(erro))
+            if st.form_submit_button("💾 Cadastrar", width="stretch"):
+                try:
+                    novo_id = produtos.cadastrar_produto(
+                        conn,
+                        sku=sku,
+                        descricao=descricao,
+                        categoria=categoria,
+                        quantidade_atual=int(quantidade_atual),
+                        quantidade_minima=int(quantidade_minima),
+                        preco_custo=preco_custo,
+                        preco_venda=preco_venda,
+                        status_garantia=status_garantia,
+                    )
+                    st.success(f"Produto cadastrado com ID {novo_id}.")
+                except ErroDeNegocio as erro:
+                    st.error(str(erro))
 
-# ---------------------------------------------------------------------------
-# Reposição (entrada de mercadoria)
-# ---------------------------------------------------------------------------
-with aba_reposicao:
-    todos = produtos.listar_produtos(conn)
-    if not todos:
-        st.info("Cadastre produtos antes de repor estoque.")
-    else:
-        opcoes = {
-            f"{p['sku']} — {p['descricao']} (estoque atual: {p['quantidade_atual']})": p
-            for p in todos
-        }
-        escolha = st.selectbox("Produto", list(opcoes.keys()))
-        quantidade = st.number_input("Quantidade a adicionar", min_value=1, step=1)
-        if st.button("📥 Registrar entrada de mercadoria", width="stretch"):
-            try:
-                novo_saldo = produtos.repor_estoque(
-                    conn, opcoes[escolha]["id_produto"], int(quantidade)
-                )
-                st.success(f"Estoque atualizado. Novo saldo: {novo_saldo}.")
-            except ErroDeNegocio as erro:
-                st.error(str(erro))
+    with aba_reposicao:
+        todos = produtos.listar_produtos(conn)
+        if not todos:
+            st.info("Cadastre produtos antes de repor estoque.")
+        else:
+            opcoes = {
+                f"{p['sku']} — {p['descricao']} (estoque atual: {p['quantidade_atual']})": p
+                for p in todos
+            }
+            escolha = st.selectbox("Produto", list(opcoes.keys()))
+            quantidade = st.number_input("Quantidade a adicionar", min_value=1, step=1)
+            if st.button("📥 Registrar entrada de mercadoria", width="stretch"):
+                try:
+                    novo_saldo = produtos.repor_estoque(
+                        conn, opcoes[escolha]["id_produto"], int(quantidade)
+                    )
+                    st.success(f"Estoque atualizado. Novo saldo: {novo_saldo}.")
+                except ErroDeNegocio as erro:
+                    st.error(str(erro))
 
 conn.close()

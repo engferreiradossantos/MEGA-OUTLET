@@ -30,6 +30,20 @@ O banco SQLite é criado automaticamente em `data/mega_outlet.db` na primeira
 execução (o caminho pode ser alterado com a variável de ambiente
 `MEGA_OUTLET_DB`).
 
+### Primeiro acesso e usuários
+
+O sistema exige **login e senha**. Na primeira execução (nenhum usuário
+cadastrado), qualquer tela exibe o formulário de **primeiro acesso** para
+criar a conta do Administrador — depois disso, todo usuário é cadastrado na
+tela **👤 Usuários**. As senhas são armazenadas apenas como hash
+PBKDF2-SHA256 (nunca em texto puro), e cada venda/lançamento registra qual
+usuário o executou.
+
+| Perfil | Pode |
+|---|---|
+| **Administrador** | Tudo: PDV, estoque (cadastro/reposição), fluxo de caixa, dashboard completo e gestão de usuários |
+| **Vendedor** | PDV, recibos, consulta de estoque e dashboard de faturamento (sem saldo do caixa) |
+
 ### Testes
 
 ```bash
@@ -43,8 +57,9 @@ python -m unittest discover -s tests -v
 | **Dashboard** | `app.py` | Faturamento diário/mensal, saldo do caixa e alerta de reposição |
 | **PDV** | `pages/1_PDV.py` | Busca de produto, carrinho, dados do cliente e "Finalizar Venda" |
 | **Estoque** | `pages/2_Estoque.py` | Cadastro de produtos, listagem e reposição |
-| **Fluxo de Caixa** | `pages/3_Fluxo_de_Caixa.py` | Lançamentos manuais (despesas) e extrato |
+| **Fluxo de Caixa** | `pages/3_Fluxo_de_Caixa.py` | Lançamentos manuais (despesas) e extrato — só Administrador |
 | **Recibos** | `pages/4_Recibos.py` | Reimpressão do recibo de qualquer venda |
+| **Usuários** | `pages/5_Usuarios.py` | Cadastro, senha e ativação de usuários — só Administrador |
 
 ## Arquitetura
 
@@ -53,16 +68,19 @@ MEGA-OUTLET/
 ├── app.py                     # Dashboard (página inicial do Streamlit)
 ├── pages/                     # Demais telas (PDV, Estoque, Caixa, Recibos)
 ├── mega_outlet/
+│   ├── autenticacao.py        # Login, primeiro acesso e controle por perfil (UI)
 │   ├── constants.py           # Enums e textos de domínio (formas de pagamento etc.)
 │   ├── database.py            # Conexão SQLite + DDL das tabelas
 │   ├── erros.py               # Exceções de negócio
 │   ├── seed.py                # Dados de demonstração
 │   └── services/              # Regras de negócio (sem dependência de Streamlit)
 │       ├── produtos.py        # Cadastro, busca e reposição de estoque
+│       ├── usuarios.py        # Usuários: hash de senha, autenticação, perfis
 │       ├── vendas.py          # ⭐ registrar_venda — transação atômica
 │       ├── caixa.py           # Lançamentos, saldo, faturamento, extrato
 │       └── recibo.py          # Recibo HTML para impressão/PDF
 └── tests/
+    ├── test_usuarios.py       # Testes de login, senha e perfis
     └── test_vendas.py         # Testes das regras de negócio críticas
 ```
 

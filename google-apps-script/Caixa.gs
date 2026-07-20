@@ -4,13 +4,15 @@
  * Colunas da aba Fluxo_Caixa:
  *   A ID_Lancamento | B Data_Hora | C Tipo | D Categoria | E Valor
  *   F Forma_Pagamento | G ID_Venda (vazio em lançamentos manuais)
+ *   H ID_Usuario (quem lançou)
  */
 
 /**
  * Insere um lançamento no Fluxo_Caixa SEM bloqueio próprio — usada por
  * `registrarVenda` (que já detém o lock) e por `registrarLancamentoManual`.
  *
- * @param {Object} dados { tipo, categoria, valor, formaPagamento, idVenda? }
+ * @param {Object} dados
+ *   { tipo, categoria, valor, formaPagamento, idVenda?, idUsuario? }
  * @return {number} ID do lançamento gerado
  */
 function inserirLancamentoCaixa_(dados) {
@@ -32,7 +34,7 @@ function inserirLancamentoCaixa_(dados) {
   const idLancamento = proximoId_(aba);
   aba.appendRow([
     idLancamento, new Date(), dados.tipo, categoria, valor,
-    dados.formaPagamento, dados.idVenda || '',
+    dados.formaPagamento, dados.idVenda || '', dados.idUsuario || '',
   ]);
   return idLancamento;
 }
@@ -40,11 +42,15 @@ function inserirLancamentoCaixa_(dados) {
 /**
  * Lançamento manual de Entrada/Saída (regra 3.2 — "Conciliação").
  * Chamada pelo Lancamento.html via google.script.run.
+ * Exclusivo do perfil Administrador (exige token de sessão).
  */
 function registrarLancamentoManual(dados) {
+  const operador = validarSessao_(dados.token, ['Administrador']);
+
   const bloqueio = LockService.getScriptLock();
   bloqueio.waitLock(30000);
   try {
+    dados.idUsuario = operador.idUsuario; // registra quem lançou
     const id = inserirLancamentoCaixa_(dados);
     SpreadsheetApp.flush();
     return { idLancamento: id };

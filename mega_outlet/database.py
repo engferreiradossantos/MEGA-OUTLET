@@ -47,6 +47,18 @@ CREATE TABLE IF NOT EXISTS produtos (
     status_garantia   TEXT    NOT NULL DEFAULT '90 dias'
 );
 
+-- Usuários do sistema (login, senha com hash PBKDF2 e perfil de acesso) ------
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+    login      TEXT    NOT NULL UNIQUE,
+    nome       TEXT    NOT NULL,
+    senha_hash TEXT    NOT NULL,                         -- pbkdf2_sha256$iter$salt$hash
+    perfil     TEXT    NOT NULL
+               CHECK (perfil IN ('Administrador', 'Vendedor')),
+    ativo      INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1)),
+    criado_em  TEXT    NOT NULL
+);
+
 -- 2.3 Vendas e Pedidos ------------------------------------------------------
 CREATE TABLE IF NOT EXISTS vendas (
     id_venda         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +70,8 @@ CREATE TABLE IF NOT EXISTS vendas (
                      CHECK (forma_entrega IN ('Retira', 'Entrega Própria', 'Transportadora')),
     endereco_entrega TEXT,                               -- obrigatório se não for 'Retira'
     valor_total      REAL    NOT NULL CHECK (valor_total >= 0),
-    observacoes      TEXT
+    observacoes      TEXT,
+    id_usuario       INTEGER REFERENCES usuarios (id_usuario)  -- quem vendeu
 );
 
 -- 2.4 Itens da Venda (tabela relacional) ------------------------------------
@@ -80,7 +93,8 @@ CREATE TABLE IF NOT EXISTS fluxo_caixa (
     forma_pagamento TEXT    NOT NULL
                     CHECK (forma_pagamento IN
                            ('PIX', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro')),
-    id_venda        INTEGER REFERENCES vendas (id_venda) -- NULL em lançamentos manuais
+    id_venda        INTEGER REFERENCES vendas (id_venda), -- NULL em lançamentos manuais
+    id_usuario      INTEGER REFERENCES usuarios (id_usuario)  -- quem lançou
 );
 
 -- Índices para as consultas mais frequentes (busca no PDV, extrato, dashboard)
@@ -111,9 +125,25 @@ def get_connection(db_path: str = DB_PATH_PADRAO) -> sqlite3.Connection:
     return conn
 
 
+def _garantir_coluna(
+    conn: sqlite3.Connection, tabela: str, coluna: str, ddl: str
+) -> None:
+    """Migração leve: adiciona a coluna se ela ainda não existir na tabela."""
+    existentes = {
+        linha["name"] for linha in conn.execute(f"PRAGMA table_info({tabela})")
+    }
+    if coluna not in existentes:
+        conn.execute(f"ALTER TABLE {tabela} ADD COLUMN {ddl}")
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     """Cria as tabelas e índices (não destrutivo — pode rodar sempre)."""
     conn.executescript(SCHEMA_SQL)
+    # Migração para bancos criados antes do controle de usuários
+    _garantir_coluna(conn, "vendas", "id_usuario",
+                     "id_usuario INTEGER REFERENCES usuarios (id_usuario)")
+    _garantir_coluna(conn, "fluxo_caixa", "id_usuario",
+                     "id_usuario INTEGER REFERENCES usuarios (id_usuario)")
     conn.commit()
 
 

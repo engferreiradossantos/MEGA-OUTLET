@@ -111,7 +111,8 @@ def gerar_recibo_html(dados_venda: dict, loja: dict = DADOS_LOJA) -> str:
     <strong>CPF:</strong> {html.escape(venda["cliente_cpf"] or "—")} &nbsp;|&nbsp;
     <strong>Telefone:</strong> {html.escape(venda["cliente_telefone"] or "—")}<br>
     <strong>Entrega:</strong> {entrega}<br>
-    <strong>Forma de pagamento:</strong> {html.escape(forma_pagamento)}
+    <strong>Forma de pagamento:</strong> {html.escape(forma_pagamento)}<br>
+    <strong>Atendido por:</strong> {html.escape(venda.get("vendedor_nome") or "—")}
   </div>
 
   <h2>Itens</h2>

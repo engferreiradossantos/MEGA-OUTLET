@@ -22,6 +22,13 @@ class ProdutoNaoEncontrado(ErroDeNegocio):
         super().__init__(f"Produto com ID {id_produto} não encontrado no cadastro.")
 
 
+class CredenciaisInvalidas(ErroDeNegocio):
+    """Login/senha incorretos ou usuário desativado."""
+
+    def __init__(self):
+        super().__init__("Login ou senha inválidos, ou usuário desativado.")
+
+
 class EstoqueInsuficiente(ErroDeNegocio):
     """
     Tentativa de vender quantidade maior que a disponível (regra 3.1),

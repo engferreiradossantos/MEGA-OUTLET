@@ -20,6 +20,7 @@ const ABAS = {
   VENDAS: 'Vendas',           // 2.3 Vendas e Pedidos
   ITENS: 'Itens_Venda',       // 2.4 Itens da Venda (tabela relacional)
   CAIXA: 'Fluxo_Caixa',       // 2.2 Fluxo de Caixa
+  USUARIOS: 'Usuarios',       // usuários do sistema (login, senha, perfil)
   DASHBOARD: 'Dashboard',     // requisito 4 — indicadores
 };
 
@@ -30,11 +31,13 @@ const CABECALHOS = {
                     'Preco_Custo', 'Preco_Venda', 'Status_Garantia'],
   [ABAS.VENDAS]:   ['ID_Venda', 'Data_Venda', 'Cliente_Nome', 'Cliente_CPF',
                     'Cliente_Telefone', 'Forma_Entrega', 'Endereco_Entrega',
-                    'Valor_Total', 'Observacoes'],
+                    'Valor_Total', 'Observacoes', 'ID_Usuario'],
   [ABAS.ITENS]:    ['ID_Item', 'ID_Venda', 'ID_Produto', 'Quantidade',
                     'Preco_Unitario_Aplicado'],
   [ABAS.CAIXA]:    ['ID_Lancamento', 'Data_Hora', 'Tipo', 'Categoria',
-                    'Valor', 'Forma_Pagamento', 'ID_Venda'],
+                    'Valor', 'Forma_Pagamento', 'ID_Venda', 'ID_Usuario'],
+  [ABAS.USUARIOS]: ['ID_Usuario', 'Login', 'Nome', 'Perfil', 'Ativo',
+                    'Salt', 'Senha_Hash'],
 };
 
 // ---------------------------------------------------------------------------
@@ -49,6 +52,11 @@ const CATEGORIAS_CAIXA = ['Venda de Mercadoria', 'Pagamento de Fornecedor',
                           'Custos Fixos', 'Pro Labore'];
 // Categoria usada automaticamente na Entrada gerada por uma venda (regra 3.2)
 const CATEGORIA_CAIXA_VENDA = 'Venda de Mercadoria';
+
+// Perfis de acesso do sistema:
+//   Administrador — acesso total (usuários, lançamentos manuais, tudo do PDV)
+//   Vendedor      — PDV e recibos
+const PERFIS_USUARIO = ['Administrador', 'Vendedor'];
 
 // Aviso legal anexado automaticamente quando a venda contém produto de
 // mostruário/outlet (regra 3.1 — "Status Especial")
@@ -75,6 +83,8 @@ function onOpen() {
     .addItem('💰 Lançamento manual no caixa', 'abrirLancamentoManual')
     .addItem('🖨️ Reimprimir recibo…', 'reimprimirRecibo')
     .addSeparator()
+    .addItem('👤 Gerenciar usuários', 'abrirUsuarios')
+    .addSeparator()
     .addItem('⚙️ Configurar planilha (criar abas)', 'configurarPlanilha')
     .addItem('📦 Inserir produtos de demonstração', 'inserirProdutosDemo')
     .addToUi();
@@ -92,8 +102,16 @@ function abrirPdv() {
 function abrirLancamentoManual() {
   const html = HtmlService.createHtmlOutputFromFile('Lancamento')
     .setWidth(420)
-    .setHeight(420);
+    .setHeight(560);
   SpreadsheetApp.getUi().showModalDialog(html, '💰 Lançamento manual no caixa');
+}
+
+/** Abre a gestão de usuários (exclusiva do perfil Administrador). */
+function abrirUsuarios() {
+  const html = HtmlService.createHtmlOutputFromFile('Usuarios')
+    .setWidth(760)
+    .setHeight(640);
+  SpreadsheetApp.getUi().showModalDialog(html, '👤 Usuários do sistema');
 }
 
 /** Pergunta o número da venda e exibe o recibo para impressão (requisito 4). */
@@ -145,6 +163,7 @@ function configurarPlanilha() {
   const abaProdutos = planilha.getSheetByName(ABAS.PRODUTOS);
   const abaVendas = planilha.getSheetByName(ABAS.VENDAS);
   const abaCaixa = planilha.getSheetByName(ABAS.CAIXA);
+  const abaUsuarios = planilha.getSheetByName(ABAS.USUARIOS);
 
   // ----- Validações de dados (listas suspensas dos enums) -----------------
   aplicarListaSuspensa_(abaProdutos.getRange('D2:D'), CATEGORIAS_PRODUTO, false);
@@ -153,6 +172,12 @@ function configurarPlanilha() {
   aplicarListaSuspensa_(abaCaixa.getRange('C2:C'), TIPOS_LANCAMENTO, false);
   aplicarListaSuspensa_(abaCaixa.getRange('D2:D'), CATEGORIAS_CAIXA, true);
   aplicarListaSuspensa_(abaCaixa.getRange('F2:F'), FORMAS_PAGAMENTO, false);
+  aplicarListaSuspensa_(abaUsuarios.getRange('D2:D'), PERFIS_USUARIO, false);
+  aplicarListaSuspensa_(abaUsuarios.getRange('E2:E'), ['Sim', 'Não'], false);
+
+  // A aba de usuários guarda hashes de senha — fica oculta; toda a gestão
+  // é feita pelo menu 👤 Gerenciar usuários (Ver → abas ocultas, se precisar)
+  try { abaUsuarios.hideSheet(); } catch (e) { /* única aba visível: ignora */ }
 
   // ----- Formatos de número (moeda e datas) -------------------------------
   abaProdutos.getRange('G2:H').setNumberFormat('"R$" #,##0.00');

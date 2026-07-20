@@ -21,6 +21,7 @@
  *
  * @param {Object} dados
  *   {
+ *     token: string,                  // token de sessão obtido em loginUsuario
  *     clienteNome: string,            // obrigatório
  *     clienteCpf: string,
  *     clienteTelefone: string,
@@ -34,6 +35,10 @@
  * @return {Object} { idVenda, valorTotal, reciboHtml }
  */
 function registrarVenda(dados) {
+  // Exige sessão válida (Administrador ou Vendedor) — o operador logado
+  // fica registrado na venda e no lançamento do caixa
+  const operador = validarSessao_(dados.token, PERFIS_USUARIO);
+
   const bloqueio = LockService.getScriptLock();
   bloqueio.waitLock(30000); // espera até 30s por outro caixa concluir
 
@@ -127,6 +132,7 @@ function registrarVenda(dados) {
       String(dados.clienteCpf || '').trim(),
       String(dados.clienteTelefone || '').trim(),
       dados.formaEntrega, enderecoEntrega, valorTotal, observacoes,
+      operador.idUsuario,
     ]);
 
     // 4b) Itens da venda (aba Itens_Venda — requisito 2.4), em lote
@@ -154,6 +160,7 @@ function registrarVenda(dados) {
       valor: valorTotal,
       formaPagamento: dados.formaPagamento,
       idVenda: idVenda,
+      idUsuario: operador.idUsuario,
     });
 
     SpreadsheetApp.flush(); // garante a persistência antes de liberar o lock
@@ -182,11 +189,14 @@ function gerarReciboHtml(idVenda) {
   // ----- Cabeçalho da venda ------------------------------------------------
   const abaVendas = obterAba_(ABAS.VENDAS);
   const dadosVendas = abaVendas.getLastRow() < 2 ? [] :
-    abaVendas.getRange(2, 1, abaVendas.getLastRow() - 1, 9).getValues();
+    abaVendas.getRange(2, 1, abaVendas.getLastRow() - 1, 10).getValues();
   const venda = dadosVendas.filter(function (v) {
     return Number(v[0]) === idVenda;
   })[0];
   if (!venda) throw new Error('Venda ' + idVenda + ' não encontrada.');
+
+  // Nome de quem atendeu (coluna ID_Usuario da venda)
+  const nomeVendedor = mapaNomesUsuarios_()[Number(venda[9])] || '—';
 
   // ----- Itens + produtos --------------------------------------------------
   const abaItens = obterAba_(ABAS.ITENS);
@@ -198,7 +208,7 @@ function gerarReciboHtml(idVenda) {
   // ----- Forma de pagamento (está na Entrada vinculada do Fluxo_Caixa) -----
   const abaCaixa = obterAba_(ABAS.CAIXA);
   const lancamento = (abaCaixa.getLastRow() < 2 ? [] :
-    abaCaixa.getRange(2, 1, abaCaixa.getLastRow() - 1, 7).getValues())
+    abaCaixa.getRange(2, 1, abaCaixa.getLastRow() - 1, 8).getValues())
     .filter(function (l) {
       return Number(l[6]) === idVenda && l[2] === 'Entrada';
     })[0];
@@ -264,7 +274,8 @@ function gerarReciboHtml(idVenda) {
     '<strong>CPF:</strong> ' + escaparHtml_(venda[3] || '—') +
     ' | <strong>Telefone:</strong> ' + escaparHtml_(venda[4] || '—') + '<br>' +
     '<strong>Entrega:</strong> ' + entrega + '<br>' +
-    '<strong>Forma de pagamento:</strong> ' + escaparHtml_(formaPagamento) +
+    '<strong>Forma de pagamento:</strong> ' + escaparHtml_(formaPagamento) + '<br>' +
+    '<strong>Atendido por:</strong> ' + escaparHtml_(nomeVendedor) +
     '</div>' +
     '<h2>Itens</h2>' +
     '<table><thead><tr><th>Código</th><th>Descrição</th>' +
