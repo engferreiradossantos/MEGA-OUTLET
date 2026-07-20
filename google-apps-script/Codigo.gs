@@ -106,9 +106,14 @@ function abrirLancamentoManual() {
   SpreadsheetApp.getUi().showModalDialog(html, '💰 Lançamento manual no caixa');
 }
 
-/** Abre a gestão de usuários (exclusiva do perfil Administrador). */
+/**
+ * Abre a gestão de usuários (exclusiva do perfil Administrador).
+ * O arquivo HTML chama-se "TelaUsuarios" porque o Apps Script não permite
+ * dois arquivos com o mesmo nome no projeto — e "Usuarios" já é o nome
+ * do arquivo de script Usuarios.gs.
+ */
 function abrirUsuarios() {
-  const html = HtmlService.createHtmlOutputFromFile('Usuarios')
+  const html = HtmlService.createHtmlOutputFromFile('TelaUsuarios')
     .setWidth(760)
     .setHeight(640);
   SpreadsheetApp.getUi().showModalDialog(html, '👤 Usuários do sistema');

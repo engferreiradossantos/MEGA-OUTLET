@@ -19,10 +19,16 @@ uma planilha do Google Sheets, com interface em HTML/CSS.
    | `Usuarios.gs` | Script | `Usuarios.gs` |
    | `PDV` | HTML | `PDV.html` |
    | `Lancamento` | HTML | `Lancamento.html` |
-   | `Usuarios` | HTML | `Usuarios.html` |
+   | `TelaUsuarios` | HTML | `TelaUsuarios.html` |
 
    > ⚠️ Os arquivos HTML devem se chamar exatamente **PDV**, **Lancamento** e
-   > **Usuarios** (o editor acrescenta o `.html` sozinho).
+   > **TelaUsuarios** (o editor acrescenta o `.html` sozinho).
+   >
+   > ⚠️ **Importante:** o arquivo HTML de usuários chama-se **TelaUsuarios**
+   > (e não "Usuarios"). O Apps Script **não permite dois arquivos com o
+   > mesmo nome** no projeto, mesmo sendo de tipos diferentes — como já existe
+   > o script `Usuarios.gs`, um HTML chamado "Usuarios" causaria conflito e a
+   > tela não abriria.
 
 4. Salve tudo (💾 ou `Ctrl+S`) e **recarregue a aba da planilha** no navegador.
 5. Vai aparecer o menu **🏬 MEGA OUTLET**. Clique em
